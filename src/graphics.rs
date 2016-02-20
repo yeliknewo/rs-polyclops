@@ -5,11 +5,13 @@ use glium::glutin::{WindowBuilder, get_primary_monitor};
 use glium::{Surface, DisplayBuild, Program, VertexBuffer, IndexBuffer, DrawParameters};
 use glium;
 
+use nalgebra::{Mat4};
+
 use image::{RgbaImage};
 
 use std::collections::HashMap;
 
-use utils::{Index, ID};
+use utils::{Index, ID, IDType, IDManager};
 
 pub struct Window {
     facade: GlutinFacade,
@@ -18,6 +20,7 @@ pub struct Window {
     vertex_buffers: HashMap<ID, VertexBuffer<Vertex>>,
     index_buffers: HashMap<ID, IndexBuffer<Index>>,
     draw_parameters: HashMap<ID, DrawParameters<'static>>,
+    transforms: HashMap<ID, Mat4<f32>>,
 }
 
 impl Window {
@@ -71,6 +74,7 @@ impl Window {
                     vertex_buffers: HashMap::new(),
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
+                    transforms: HashMap::new(),
                 }
             },
             WindowArgs::Borderless(title) => {
@@ -91,18 +95,20 @@ impl Window {
                     vertex_buffers: HashMap::new(),
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
+                    transforms: HashMap::new(),
                 }
             },
         }
     }
 
     pub fn frame(&mut self) -> Frame {
-        Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters)
+        Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters, &mut self.transforms)
     }
 
     pub fn poll_events(&mut self) {
         for event in self.facade.poll_events() {
             match event {
+                glium::glutin::Event::Closed => panic!("Exiting The Lazy Way"),
                 _ => (),
             }
         }
@@ -121,11 +127,20 @@ pub struct Frame<'a> {
     vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>,
     index_buffers: &'a mut HashMap<ID, IndexBuffer<Index>>,
     draw_parameters: &'a mut HashMap<ID, DrawParameters<'static>>,
+    transforms: &'a mut HashMap<ID, Mat4<f32>>,
     frame: glium::Frame,
 }
 
 impl<'a> Frame<'a> {
-    fn new(facade: &'a mut GlutinFacade, program: &'a mut Program, texture_buffers: &'a mut HashMap<ID, Texture2d>, vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>, index_buffers: &'a mut HashMap<ID, IndexBuffer<Index>>, draw_parameters: &'a mut HashMap<ID, DrawParameters<'static>>) -> Frame<'a> {
+    fn new(
+        facade: &'a mut GlutinFacade,
+        program: &'a mut Program,
+        texture_buffers: &'a mut HashMap<ID, Texture2d>,
+        vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>,
+        index_buffers: &'a mut HashMap<ID, IndexBuffer<Index>>,
+        draw_parameters: &'a mut HashMap<ID, DrawParameters<'static>>,
+        transforms: &'a mut HashMap<ID, Mat4<f32>>,
+    ) -> Frame<'a> {
         let mut frame = facade.draw();
         frame.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
         Frame {
@@ -136,27 +151,32 @@ impl<'a> Frame<'a> {
             vertex_buffers: vertex_buffers,
             index_buffers: index_buffers,
             draw_parameters: draw_parameters,
+            transforms: transforms,
         }
     }
 
-    pub fn draw_triangle(&mut self, triangle: &Triangle) {
-        self.frame.draw(&self.vertex_buffers[&triangle.vertex_id], &self.index_buffers[&triangle.index_id], &self.program, &uniform!(tex: &self.texture_buffers[&triangle.texture_id]), &self.draw_parameters[&triangle.draw_parameters_id]).expect("Unable to draw Triangle");
+    pub fn draw_entity(&mut self, entity: &Entity) {
+        self.frame.draw(&self.vertex_buffers[&entity.vertex_id], &self.index_buffers[&entity.index_id], &self.program, &uniform!(tex: &self.texture_buffers[&entity.texture_id], transform: &self.transforms[&entity.transform_id]), &self.draw_parameters[&entity.draw_parameters_id]).expect("Unable to draw Entity");
     }
 
-    pub fn set_triangle_vertices(&mut self, triangle: &Triangle, vertices: Vec<Vertex>) {
-        self.vertex_buffers.insert(triangle.vertex_id, VertexBuffer::new(self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
+    pub fn set_entity_vertices(&mut self, entity: &Entity, vertices: Vec<Vertex>) {
+        self.vertex_buffers.insert(entity.vertex_id, VertexBuffer::new(self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
     }
 
-    pub fn set_triangle_texture(&mut self, triangle: &Triangle, texture: RgbaImage) {
-        self.texture_buffers.insert(triangle.texture_id, Texture2d::new(self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
+    pub fn set_entity_texture(&mut self, entity: &Entity, texture: RgbaImage) {
+        self.texture_buffers.insert(entity.texture_id, Texture2d::new(self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
     }
 
-    pub fn set_triangle_indices(&mut self, triangle: &Triangle, indices: Vec<Index>) {
-        self.index_buffers.insert(triangle.index_id, IndexBuffer::new(self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
+    pub fn set_entity_indices(&mut self, entity: &Entity, indices: Vec<Index>) {
+        self.index_buffers.insert(entity.index_id, IndexBuffer::new(self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
     }
 
-    pub fn set_draw_parameters(&mut self, triangle: &Triangle, draw_parameters: DrawParameters<'static>) {
-        self.draw_parameters.insert(triangle.draw_parameters_id, draw_parameters);
+    pub fn set_entity_draw_parameters(&mut self, entity: &Entity, draw_parameters: DrawParameters<'static>) {
+        self.draw_parameters.insert(entity.draw_parameters_id, draw_parameters);
+    }
+
+    pub fn set_entity_transform(&mut self, entity: &Entity, transform: Mat4<f32>) {
+        self.transforms.insert(entity.transform_id, transform);
     }
 
     pub fn end(self) {
@@ -164,21 +184,43 @@ impl<'a> Frame<'a> {
     }
 }
 
-pub struct Triangle {
+pub struct Entity {
     texture_id: ID,
     vertex_id: ID,
     index_id: ID,
     draw_parameters_id: ID,
+    transform_id: ID,
 }
 
-impl Triangle {
-    pub fn new() -> Triangle {
-        Triangle {
-            texture_id: 0,
-            vertex_id: 0,
-            index_id: 0,
-            draw_parameters_id: 0,
+impl Entity {
+    pub fn new(manager: &mut IDManager) -> Entity {
+        Entity {
+            texture_id: ID::new(manager, IDType::Texture),
+            vertex_id: ID::new(manager, IDType::Vertex),
+            index_id: ID::new(manager, IDType::Index),
+            draw_parameters_id: ID::new(manager, IDType::DrawParameter),
+            transform_id: ID::new(manager, IDType::Transform),
         }
+    }
+
+    pub fn use_other_id(&mut self, other: &Entity, id_type: IDType) {
+        match id_type {
+            IDType::Vertex => {
+                self.vertex_id = other.vertex_id;
+            },
+            IDType::Index => {
+                self.index_id = other.index_id;
+            },
+            IDType::Texture => {
+                self.texture_id = other.texture_id;
+            },
+            IDType::DrawParameter => {
+                self.draw_parameters_id = other.draw_parameters_id;
+            },
+            IDType::Transform => {
+                self.transform_id = other.transform_id;
+            }
+        };
     }
 }
 

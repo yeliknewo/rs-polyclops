@@ -4,28 +4,29 @@ extern crate time;
 extern crate image;
 extern crate scoped_threadpool;
 extern crate rand;
+extern crate nalgebra;
 
 mod graphics;
-
-use graphics::{Window, WindowArgs, Triangle, Vertex};
-
 mod utils;
 
-use utils::Index;
+use graphics::{Window, WindowArgs, Entity, Vertex};
+
+use utils::{Index, IDManager, IDType};
 
 pub static RAW_TEXTURE: &'static [u8] = include_bytes!("..\\assets\\texture.png");
 
 fn main() {
     graphics::init_vertex();
+    let mut manager = IDManager::new();
 
     let mut window: Window = Window::new(WindowArgs::Borderless("Polyclops".to_string()));
 
-    let triangle = Triangle::new();
+    let entity = Entity::new(&mut manager);
 
     let vertices: Vec<Vertex> = vec!{
-        Vertex::new([-1.0, -1.0, -1.0], [0.0, 0.0]),
-        Vertex::new([1.0, -1.0, -1.0], [1.0, 0.0]),
-        Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0]),
+        Vertex::new([-1.0, -1.0, 0.0], [0.0, 0.0]),
+        Vertex::new([1.0, -1.0, 0.0], [1.0, 0.0]),
+        Vertex::new([-1.0, 1.0, 0.0], [0.0, 1.0]),
     };
 
     let indices: Vec<Index> = vec!{
@@ -47,21 +48,25 @@ fn main() {
 
     {
         let mut frame = window.frame();
-        frame.set_triangle_vertices(&triangle, vertices);
-        frame.set_triangle_indices(&triangle, indices);
-        frame.set_triangle_texture(&triangle, texture);
-        frame.set_draw_parameters(&triangle, draw_parameters);
-        frame.draw_triangle(&triangle);
+        frame.set_entity_vertices(&entity, vertices);
+        frame.set_entity_indices(&entity, indices);
+        frame.set_entity_texture(&entity, texture);
+        frame.set_entity_draw_parameters(&entity, draw_parameters);
+        frame.draw_entity(&entity);
         frame.end();
     }
 
-    let mut i = 0;
+    let mut t2 = Entity::new(&mut manager);
+
+    t2.use_other_id(&entity, IDType::Vertex);
+    t2.use_other_id(&entity, IDType::Index);
+    t2.use_other_id(&entity, IDType::Texture);
+    t2.use_other_id(&entity, IDType::DrawParameter);
+
     loop {
         window.poll_events();
         let mut frame = window.frame();
-        frame.draw_triangle(&triangle);
+        frame.draw_entity(&t2);
         frame.end();
-        println!("{}", i);
-        i += 1;
     }
 }
