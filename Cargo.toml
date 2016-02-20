@@ -1,8 +1,10 @@
 [package]
 name = "rs-polyclops"
 version = "0.1.0"
-authors = ["yelik"]
+authors = ["Kiley Owen"]
 [dependencies]
-glium = "0.13.3"
-time = "0.1.34"
-image = "0.6.1"
+glium = "*"
+time = "*"
+image = "*"
+scoped_threadpool = "*"
+rand = "*"
