@@ -1,23 +1,11 @@
-#[macro_use]
-extern crate glium;
-extern crate time;
-extern crate image;
-extern crate scoped_threadpool;
-extern crate rand;
-extern crate nalgebra;
+extern crate polyclops;
 
-mod graphics;
-mod utils;
-
-use graphics::{Window, WindowArgs, Entity, Vertex};
-
-use utils::{Index, IDManager, IDType};
+use polyclops::{Window, WindowArgs, Entity, Vertex, Index, IDType};
 
 pub static RAW_TEXTURE: &'static [u8] = include_bytes!("..\\assets\\texture.png");
 
 fn main() {
-    graphics::init_vertex();
-    let mut manager = IDManager::new();
+    let mut manager = polyclops::init();
 
     let mut window: Window = Window::new(WindowArgs::Borderless("Polyclops".to_string()));
 
@@ -34,24 +22,12 @@ fn main() {
         2, 1, 0,
     };
 
-    let texture = image::load_from_memory(RAW_TEXTURE).expect("Error Loading Image").to_rgba();
-
-    let draw_parameters = glium::DrawParameters {
-        depth: glium::Depth {
-            test: glium::draw_parameters::DepthTest::IfLess,
-            write: true,
-            .. Default::default()
-        },
-        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-        .. Default::default()
-    };
-
     {
         let mut frame = window.frame();
         frame.set_entity_vertices(&entity, vertices);
         frame.set_entity_indices(&entity, indices);
-        frame.set_entity_texture(&entity, texture);
-        frame.set_entity_draw_parameters(&entity, draw_parameters);
+        frame.set_entity_texture(&entity, RAW_TEXTURE);
+        frame.set_default_draw_parameters(&entity);
         frame.draw_entity(&entity);
         frame.end();
     }

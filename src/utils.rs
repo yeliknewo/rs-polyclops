@@ -21,7 +21,6 @@ pub enum IDType {
     Index = 1,
     Texture = 2,
     DrawParameter = 3,
-    Transform = 4,
 }
 
 pub struct IDManager {
