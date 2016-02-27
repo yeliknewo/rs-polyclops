@@ -15,12 +15,15 @@ impl ID {
     }
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum IDType {
     Vertex = 0,
     Index = 1,
     Texture = 2,
     DrawParameter = 3,
+    Perspective = 4,
+    View = 5,
+    Model = 6,
 }
 
 pub struct IDManager {

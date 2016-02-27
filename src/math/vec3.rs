@@ -2,7 +2,7 @@ use glium::uniforms::{AsUniformValue, UniformValue};
 
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
 
-use math::{Vec4, Mat4};
+use math::{Mat4};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Vec3 {
