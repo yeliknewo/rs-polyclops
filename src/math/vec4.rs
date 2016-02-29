@@ -1,5 +1,4 @@
 use glium::uniforms::{AsUniformValue, UniformValue};
-
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
 use std::fmt::{Display, Formatter, Error};
 

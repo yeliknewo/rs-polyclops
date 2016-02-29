@@ -6,6 +6,7 @@ use glium::{Surface, DisplayBuild, Program, VertexBuffer, IndexBuffer, DrawParam
 use glium;
 use image::{load_from_memory};
 use std::collections::{HashMap};
+
 use math::{Mat4, Vec2, Vec3};
 use utils::{ID, IDType, EntityIDType, IDManager};
 
@@ -119,7 +120,7 @@ impl Window {
         Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters, &mut self.perspective_mat4s, &mut self.view_mat4s, &mut self.model_mat4s)
     }
 
-    pub fn poll_events(&mut self) -> PollEventsIter {
+    pub fn poll_events(&self) -> PollEventsIter {
         self.facade.poll_events()
     }
 

@@ -1,21 +1,35 @@
 use std::collections::{HashMap};
 use std::sync::{Arc, RwLock};
+use glium::glutin::ElementState as GliumElementState;
+use glium::glutin::MouseButton as GliumMouseButton;
+use glium::glutin::VirtualKeyCode as GliumKeyCode;
 
 use utils::{ID, EntityIDType};
 use graphics::{Vertex, Index, DrawMethod};
 use math::{Vec2, Vec3, Mat4};
 use being::{Being, BeingType};
+use keyboard::{Keyboard};
 
 pub struct World<T: BeingType<T>> {
     beings: HashMap<ID, Arc<RwLock<Box<Being<T>>>>>,
     base_beings: HashMap<T, Arc<RwLock<Box<Being<T>>>>>,
+    mouse_pos: Vec2,
+    resolution: Vec2,
+    aspect_ratio: f32,
+    mouse_buttons: HashMap<GliumMouseButton, GliumElementState>,
+    keyboard: Keyboard,
 }
 
 impl<T: BeingType<T>> World<T> {
-    pub fn new() -> World<T> {
+    pub fn new(resolution: Vec2) -> World<T> {
         World {
             beings: HashMap::new(),
             base_beings: HashMap::new(),
+            mouse_pos: Vec2::zero(),
+            resolution: resolution,
+            aspect_ratio: resolution[0] / resolution[1],
+            mouse_buttons: HashMap::new(),
+            keyboard: Keyboard::new(),
         }
     }
 
@@ -41,6 +55,42 @@ impl<T: BeingType<T>> World<T> {
 
     pub fn get_base_being(&self, being_type: T) -> Option<&Arc<RwLock<Box<Being<T>>>>> {
         self.base_beings.get(&being_type)
+    }
+
+    pub fn update_keyboard(&mut self, key: GliumKeyCode, state: GliumElementState) {
+        self.keyboard.set_key_state(key, state);
+    }
+
+    pub fn update_mouse_button(&mut self, mouse_button: GliumMouseButton, element_state: GliumElementState) {
+        self.mouse_buttons.insert(mouse_button, element_state);
+    }
+
+    pub fn update_resolution(&mut self, resolution: Vec2, aspect_ratio: f32) {
+        self.resolution = resolution;
+        self.aspect_ratio = aspect_ratio;
+    }
+
+    pub fn update_mouse_pos(&mut self, mouse_pos: Vec2) {
+        self.mouse_pos = mouse_pos;
+    }
+
+    pub fn get_key(&self, key: GliumKeyCode) -> GliumElementState {
+        self.keyboard.is_key_down(key)
+    }
+
+    pub fn get_mouse_button(&self, mouse_button: GliumMouseButton) -> GliumElementState {
+        match self.mouse_buttons.get(&mouse_button) {
+            Some(state) => *state,
+            None => GliumElementState::Released,
+        }
+    }
+
+    pub fn get_start_resolution(&self) -> Vec2 {
+        self.resolution
+    }
+
+    pub fn get_mouse_pos(&self) -> Vec2 {
+        self.mouse_pos
     }
 }
 

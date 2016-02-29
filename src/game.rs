@@ -1,40 +1,83 @@
 use std::collections::{HashMap};
 use std::sync::{Arc, RwLock};
 use glium::glutin::Event as WindowEvent;
+use glium::glutin::ElementState as GliumElementState;
+use glium::glutin::MouseButton as GliumMouseButton;
+use glium::glutin::VirtualKeyCode as GliumKeyCode;
 use scoped_threadpool::{Pool};
 use time::{precise_time_s};
+
 use utils::{UNSET_ID, ID, IDManager, IDType};
 use world::{World, WorldEvent, EntityEvent, EntityBaseEvent, Vec2Event, Vec3Event, get_rank};
 use graphics::{Window, method_to_parameters};
 use being::{BeingType, Being};
+use math::{Vec2};
+use keyboard::{Keyboard};
 
 pub struct Game<T: BeingType<T>> {
     worlds: HashMap<ID, Arc<RwLock<World<T>>>>,
     active_world_id: ID,
     thread_pool: Pool,
-    window: Window,
-    resolution: (u32, u32),
+    resolution: Vec2,
     aspect_ratio: f32,
+    mouse_pos: Vec2,
+    keyboard: Keyboard,
+    mouse_buttons: HashMap<GliumMouseButton, GliumElementState>,
 }
 
 impl<T: BeingType<T>> Game<T> {
-    pub fn new(manager: &mut IDManager, thread_count: u32, active_world: World<T>, window: Window) -> Game<T> {
+    pub fn new(manager: &mut IDManager, thread_count: u32, active_world: World<T>, resolution: Vec2) -> Game<T> {
         let id = ID::new(manager, IDType::World);
         let mut map = HashMap::new();
         map.insert(id, Arc::new(RwLock::new(active_world)));
-        let resolution = window.get_start_resolution();
+        let keyboard = Keyboard::new();
         Game {
             worlds: map,
             active_world_id: id,
             thread_pool: Pool::new(thread_count),
-            aspect_ratio: resolution.0 as f32 / resolution.1 as f32,
+            aspect_ratio: resolution[0] / resolution[1],
             resolution: resolution,
-            window: window,
+            mouse_pos: Vec2::zero(),
+            keyboard: keyboard,
+            mouse_buttons: HashMap::new(),
         }
     }
 
-    pub fn run(&mut self, manager: &mut IDManager, starting_events: &mut Vec<WorldEvent<T>>) {
-        self.starting_events(manager, starting_events);
+    fn pause(&mut self) {
+        println!("Paused");
+    }
+
+    fn resume(&mut self) {
+        println!("Resumed");
+    }
+
+    fn update_keyboard(&mut self, key_code: GliumKeyCode, element_state: GliumElementState) {
+        self.keyboard.set_key_state(key_code, element_state);
+        self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Update Keyboard").write().expect("Unable to Write Active World in Update Mouse Pos").update_keyboard(key_code, element_state);
+    }
+
+    fn update_mouse_button(&mut self, mouse_button: GliumMouseButton, element_state: GliumElementState, ) {
+        self.mouse_buttons.insert(mouse_button, element_state);
+        self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Update Mouse Button").write().expect("Unable to Write Active World in Update Mouse Button").update_mouse_button(mouse_button, element_state);
+    }
+
+    fn update_mouse_pos(&mut self, mouse_pos: (i32, i32)) {
+        let x = mouse_pos.0 as f32;
+        let y = mouse_pos.1 as f32;
+        self.mouse_pos = Vec2::from([x, y]);
+        self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Update Mouse Pos").write().expect("Unable to Write Active World in Update Mouse Pos").update_mouse_pos(self.mouse_pos);
+    }
+
+    fn update_resolution(&mut self, resolution: (u32, u32)) {
+        let width = resolution.0 as f32;
+        let height = resolution.1 as f32;
+        self.resolution = Vec2::from([width, height]);
+        self.aspect_ratio = width / height;
+        self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Update Resolution").write().expect("Unable to Write Active World in Update Resolution").update_resolution(self.resolution, self.aspect_ratio);
+    }
+
+    pub fn run(&mut self, manager: &mut IDManager, starting_events: &mut Vec<WorldEvent<T>>, window: &mut Window) {
+        self.starting_events(manager, window, starting_events);
 
         let tps: f64 = 60.0;
         let tps_s: f64 = 1.0 / tps;
@@ -52,58 +95,56 @@ impl<T: BeingType<T>> Game<T> {
             delta_time += now - last_time;
             last_time = now;
             while delta_time > 0.0 {
-                for event in self.window.poll_events() {
+                for event in window.poll_events(){
                     match event {
-                        WindowEvent::Resized(width, height) => {
-                            self.resolution = (width, height);
-                            self.aspect_ratio = (width as f32 / height as f32);
-                        },
-                        WindowEvent::Moved(x, y) => {
-
-                        },
-                        WindowEvent::Closed => {
-
-                        },
-                        WindowEvent::DroppedFile(path_buffer) => {
-
-                        },
-                        WindowEvent::ReceivedCharacter(character) => {
-
-                        },
+                        WindowEvent::Resized(width, height) => self.update_resolution((width, height)),
+                        // WindowEvent::Moved(x, y) => {
+                        //
+                        // },
+                        WindowEvent::Closed => return,
+                        // WindowEvent::DroppedFile(path_buffer) => {
+                        //
+                        // },
+                        // WindowEvent::ReceivedCharacter(character) => {
+                        //
+                        // },
                         WindowEvent::Focused(focused) => {
+                            if focused {
+                                self.resume();
+                            } else {
+                                self.pause();
 
+                            }
                         },
-                        WindowEvent::KeyboardInput(element_state, key_code, virtual_key_code) => {
-
+                        WindowEvent::KeyboardInput(element_state, _, virtual_key_code) => match virtual_key_code {
+                            Some(virtual_key_code) => self.update_keyboard(virtual_key_code, element_state),
+                            None => (),
                         },
-                        WindowEvent::MouseMoved((x, y)) => {
-
-                        },
-                        WindowEvent::MouseWheel(mouse_scroll_data) => {
-
-                        },
-                        WindowEvent::MouseInput(element_state, mouse_button) => {
-
-                        },
-                        WindowEvent::Awakened => {
-
-                        },
-                        WindowEvent::Refresh => {
-
-                        },
-                        WindowEvent::Suspended(suspended) => {
-
-                        },
-                        WindowEvent::Touch(touch) => {
-
-                        },
+                        WindowEvent::MouseMoved(pos) => self.update_mouse_pos(pos),
+                        // WindowEvent::MouseWheel(mouse_scroll_data) => {
+                        //
+                        // },
+                        WindowEvent::MouseInput(element_state, mouse_button) => self.update_mouse_button(mouse_button, element_state),
+                        // WindowEvent::Awakened => {
+                        //
+                        // },
+                        // WindowEvent::Refresh => {
+                        //
+                        // },
+                        // WindowEvent::Suspended(suspended) => {
+                        //
+                        // },
+                        // WindowEvent::Touch(touch) => {
+                        //
+                        // },
+                        _ => (),
                     }
                 }
-                self.tick(manager, tps_s as f32);
+                self.tick(manager, window, tps_s as f32);
                 delta_time -= tps_s;
                 ticks += 1;
             }
-            self.render();
+            self.render(window);
             frames += 1;
             if now > i + 1.0 {
                 i += 1.0;
@@ -114,8 +155,8 @@ impl<T: BeingType<T>> Game<T> {
         }
     }
 
-    fn render(&mut self) {
-        let mut frame = self.window.frame();
+    fn render(&mut self, window: &mut Window) {
+        let mut frame = window.frame();
         for entry in self.worlds[&self.active_world_id].read().expect("Unable to Read World when rendering").get_beings() {
             let being = entry.1;
             frame.draw_entity(being.read().expect("Unable to Read Being when rendering").get_entity());
@@ -123,7 +164,7 @@ impl<T: BeingType<T>> Game<T> {
         frame.end();
     }
 
-    fn tick(&mut self, manager: &mut IDManager, delta_time: f32) {
+    fn tick(&mut self, manager: &mut IDManager, window: &mut Window, delta_time: f32) {
         let events_arc: Arc<RwLock<Vec<WorldEvent<T>>>> = Arc::new(RwLock::new(vec!()));
         let delta_time_arc = Arc::new(delta_time);
         let active_world = self.worlds.remove(&self.active_world_id).expect("Unable to find Active world in Tick");
@@ -148,17 +189,17 @@ impl<T: BeingType<T>> Game<T> {
             Err(_) => panic!("Unable to dereference events"),
         };
         let mut events = events.into_inner().expect("Unable to Dereference Events in Tick");
-        self.execute_events(manager, &mut events, active_world.clone());
+        self.execute_events(manager, window, &mut events, active_world.clone());
         self.worlds.insert(self.active_world_id, active_world);
     }
 
-    pub fn starting_events(&mut self, manager: &mut IDManager, events: &mut Vec<WorldEvent<T>>) {
+    pub fn starting_events(&mut self, manager: &mut IDManager, window: &mut Window, events: &mut Vec<WorldEvent<T>>) {
         let world = self.worlds.remove(&self.active_world_id).expect("Unable to Find Active World in Starting Events");
-        self.execute_events(manager, events, world.clone());
+        self.execute_events(manager, window, events, world.clone());
         self.worlds.insert(self.active_world_id, world);
     }
 
-    pub fn execute_events(&mut self, manager: &mut IDManager, events: &mut Vec<WorldEvent<T>>, active_world: Arc<RwLock<World<T>>>) {
+    pub fn execute_events(&mut self, manager: &mut IDManager, window: &mut Window, events: &mut Vec<WorldEvent<T>>, active_world: Arc<RwLock<World<T>>>) {
         let mut ranked_events: HashMap<u32, Vec<WorldEvent<T>>> = HashMap::new();
         let mut ranks: Vec<u32> = vec!();
         loop {
@@ -181,10 +222,10 @@ impl<T: BeingType<T>> Game<T> {
                     match ranked_events.get_mut(&rank).expect("Unable to Get Mut Rank in Exceute Events").pop() {
                         Some(event) => match event {
                             WorldEvent::NewBeing(being_type, mut events) => {
-                                T::make_being(manager, being_type, &mut events, self, active_world.clone());
+                                T::make_being(manager, being_type, &mut events, window, self, active_world.clone());
                             },
                             WorldEvent::NewBeingBase(being_type, mut events) => {
-                                T::make_being(manager, being_type, &mut events, self, active_world.clone());
+                                T::make_being(manager, being_type, &mut events, window, self, active_world.clone());
                             },
                             WorldEvent::EndBeing(id) => {
                                 let mut world = active_world.write().expect("Unable to Write Active World in Execute Events");
@@ -295,31 +336,31 @@ impl<T: BeingType<T>> Game<T> {
                             WorldEvent::Entity(id, entity_event) => match entity_event {
                                 EntityEvent::Vertices(vertices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_vertices(world.get_being(id).expect("Unable to Get Being in Entity Set Vertices in Execute Events").write().expect("Unable to Write Being Set Vertices in Execute Events").get_entity_mut(), vertices);
+                                    window.set_vertices(world.get_being(id).expect("Unable to Get Being in Entity Set Vertices in Execute Events").write().expect("Unable to Write Being Set Vertices in Execute Events").get_entity_mut(), vertices);
                                 },
                                 EntityEvent::Indices(indices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_indices(world.get_being(id).expect("Unable to Get Being in Entity Set Indices in Execute Events").write().expect("Unable to Write Being in Set Indices in Execute Events").get_entity_mut(), indices);
+                                    window.set_indices(world.get_being(id).expect("Unable to Get Being in Entity Set Indices in Execute Events").write().expect("Unable to Write Being in Set Indices in Execute Events").get_entity_mut(), indices);
                                 },
                                 EntityEvent::Texture(texture) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_texture(world.get_being(id).expect("Unable to Get Being in Entity Set Texture in Execute Events").write().expect("Unable to Write Being in Set Texture in Execute Events").get_entity_mut(), texture);
+                                    window.set_texture(world.get_being(id).expect("Unable to Get Being in Entity Set Texture in Execute Events").write().expect("Unable to Write Being in Set Texture in Execute Events").get_entity_mut(), texture);
                                 },
                                 EntityEvent::DrawMethod(draw_method) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_draw_parameters(world.get_being(id).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
+                                    window.set_draw_parameters(world.get_being(id).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
                                 },
                                 EntityEvent::Perspective(perspective) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_perspective_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
+                                    window.set_perspective_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
                                 },
                                 EntityEvent::View(view) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_view_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
+                                    window.set_view_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
                                 },
                                 EntityEvent::Model(model) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_model_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
+                                    window.set_model_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
                                 },
                                 EntityEvent::UseNewID(id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
@@ -353,31 +394,31 @@ impl<T: BeingType<T>> Game<T> {
                             WorldEvent::EntityBase(being_type, entity_base_event) => match entity_base_event {
                                 EntityBaseEvent::Vertices(vertices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_vertices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Vertices in Execute Events").write().expect("Unable to Write Being Set Vertices in Execute Events").get_entity_mut(), vertices);
+                                    window.set_vertices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Vertices in Execute Events").write().expect("Unable to Write Being Set Vertices in Execute Events").get_entity_mut(), vertices);
                                 },
                                 EntityBaseEvent::Indices(indices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_indices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Indices in Execute Events").write().expect("Unable to Write Being in Set Indices in Execute Events").get_entity_mut(), indices);
+                                    window.set_indices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Indices in Execute Events").write().expect("Unable to Write Being in Set Indices in Execute Events").get_entity_mut(), indices);
                                 },
                                 EntityBaseEvent::Texture(texture) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_texture(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Texture in Execute Events").write().expect("Unable to Write Being in Set Texture in Execute Events").get_entity_mut(), texture);
+                                    window.set_texture(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Texture in Execute Events").write().expect("Unable to Write Being in Set Texture in Execute Events").get_entity_mut(), texture);
                                 },
                                 EntityBaseEvent::DrawMethod(draw_method) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_draw_parameters(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
+                                    window.set_draw_parameters(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
                                 },
                                 EntityBaseEvent::Perspective(perspective) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_perspective_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
+                                    window.set_perspective_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
                                 },
                                 EntityBaseEvent::View(view) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_view_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
+                                    window.set_view_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
                                 },
                                 EntityBaseEvent::Model(model) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    self.window.set_model_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
+                                    window.set_model_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
                                 },
                                 EntityBaseEvent::UseNewID(id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
@@ -455,7 +496,7 @@ impl<T: BeingType<T>> Game<T> {
                     UNSET_ID => WorldEvent::Entity(being.get_id(), entity_event),
                     _ => event,
                 },
-                WorldEvent::EntityBase(being_type, entity_base_event) => event,
+                WorldEvent::EntityBase(_, _) => event,
             });
         }
         fixed

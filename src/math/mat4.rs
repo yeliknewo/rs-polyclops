@@ -1,6 +1,5 @@
 use std::ops::{Index, IndexMut, Mul};
 use std::fmt::{Display, Formatter, Error};
-
 use glium::uniforms::{AsUniformValue, UniformValue};
 
 use math::{Vec3, Vec4};

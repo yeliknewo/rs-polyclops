@@ -1,13 +1,14 @@
-use utils::{ID, IDManager};
-use graphics::{Entity};
-use world::{World, WorldEvent};
-use math::{Vec2, Vec3};
-use game::{Game};
 use std::sync::{Arc, RwLock};
 use std::hash::{Hash};
 
+use utils::{ID, IDManager};
+use graphics::{Entity, Window};
+use world::{World, WorldEvent};
+use math::{Vec2, Vec3};
+use game::{Game};
+
 pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Hash {
-    fn make_being(&mut IDManager, T, &mut Vec<WorldEvent<T>>, &mut Game<T>, Arc<RwLock<World<T>>>);
+    fn make_being(&mut IDManager, T, &mut Vec<WorldEvent<T>>, &mut Window, &mut Game<T>, Arc<RwLock<World<T>>>);
 }
 
 pub trait Being<T: BeingType<T>>: Send + Sync {
