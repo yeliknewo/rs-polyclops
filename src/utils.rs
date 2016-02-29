@@ -12,7 +12,17 @@ impl ID {
             id: manager.get_id(id_type),
         }
     }
+
+    pub fn get_id(&self) -> IDSize {
+        self.id
+    }
 }
+
+pub const UNSET: ID = ID{
+    id: UNSET_ID,
+};
+
+pub const UNSET_ID: IDSize = 0;
 
 impl Display for ID {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error>{
@@ -52,7 +62,7 @@ impl IDManager {
     fn get_id(&mut self, id_type: IDType) -> IDSize {
         let id = match self.map.get(&id_type) {
             Some(id) => *id,
-            None => 0,
+            None => 1,
         };
         self.map.insert(id_type, id + 1);
         id

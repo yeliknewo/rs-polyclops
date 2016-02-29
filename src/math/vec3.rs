@@ -1,8 +1,9 @@
 use glium::uniforms::{AsUniformValue, UniformValue};
 
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
+use std::fmt::{Display, Formatter, Error};
 
-use math::{Mat4};
+use math::{Mat4, Vec4};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Vec3 {
@@ -31,6 +32,10 @@ impl Vec3 {
 
 		sum
 	}
+
+	pub fn to_vec4(&self, w: f32) -> Vec4 {
+		Vec4::from([self[0], self[1], self[2], w])
+	}
 }
 
 impl From<[f32; 3]> for Vec3 {
@@ -38,6 +43,12 @@ impl From<[f32; 3]> for Vec3 {
 		Vec3{
 			vals: vals,
 		}
+	}
+}
+
+impl From<Vec4> for Vec3 {
+	fn from(vec4: Vec4) -> Vec3 {
+		Vec3::from([vec4[0], vec4[1], vec4[2]])
 	}
 }
 
@@ -99,4 +110,10 @@ impl Mul<Vec3> for Vec3 {
 	fn mul(self, other: Vec3) -> Vec3 {
 		Vec3::from([self[0] * other[0], self[1] * other[1], self[2] * other[2]])
 	}
+}
+
+impl Display for Vec3 {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>{
+        write!(f, "({}, {}, {})", self[0], self[1], self[2])
+    }
 }

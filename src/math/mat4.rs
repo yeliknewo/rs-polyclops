@@ -1,5 +1,5 @@
 use std::ops::{Index, IndexMut, Mul};
-use std::fmt;
+use std::fmt::{Display, Formatter, Error};
 
 use glium::uniforms::{AsUniformValue, UniformValue};
 
@@ -222,12 +222,8 @@ impl Mul<Mat4> for Mat4 {
 	}
 }
 
-impl fmt::Display for Mat4 {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		writeln!(f, "[{},{},{},{}]\n[{},{},{},{}]\n[{},{},{},{}]\n[{},{},{},{}]",
-			self[0][0], self[1][0], self[2][0], self[3][0],
-			self[0][1], self[1][1], self[2][1], self[3][1],
-			self[0][2], self[1][2], self[2][2], self[3][2],
-			self[0][3], self[1][3], self[2][3], self[3][3])
+impl Display for Mat4 {
+	fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+		write!(f, "{}\n{}\n{}\n{}", self[0], self[1], self[2], self[3])
 	}
 }

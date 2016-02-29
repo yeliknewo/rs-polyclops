@@ -4,12 +4,14 @@ use world::{World, WorldEvent};
 use math::{Vec2, Vec3};
 use game::{Game};
 use std::sync::{Arc, RwLock};
+use std::hash::{Hash};
 
-pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone {
+pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Hash {
     fn make_being(&mut IDManager, T, &mut Vec<WorldEvent<T>>, &mut Game<T>, Arc<RwLock<World<T>>>);
 }
 
 pub trait Being<T: BeingType<T>>: Send + Sync {
+    fn get_type(&self) -> T;
     fn get_id(&self) -> ID;
     fn get_entity(&self) -> &Entity;
     fn tick(&self, &World<T>, &f32) -> Vec<WorldEvent<T>>;

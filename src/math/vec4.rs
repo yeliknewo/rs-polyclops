@@ -1,6 +1,7 @@
 use glium::uniforms::{AsUniformValue, UniformValue};
 
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
+use std::fmt::{Display, Formatter, Error};
 
 use math::{Mat4};
 
@@ -105,4 +106,10 @@ impl Mul<Vec4> for Vec4 {
 	fn mul(self, other: Vec4) -> Vec4 {
 		Vec4::from([self[0] * other[0], self[1] * other[1], self[2] * other[2], self[3] * other[3]])
 	}
+}
+
+impl Display for Vec4 {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>{
+        write!(f, "({}, {}, {}, {})", self[0], self[1], self[2], self[3])
+    }
 }
