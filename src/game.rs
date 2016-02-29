@@ -1,5 +1,6 @@
 use std::collections::{HashMap};
 use std::sync::{Arc, RwLock};
+use glium::glutin::Event as WindowEvent;
 use scoped_threadpool::{Pool};
 use time::{precise_time_s};
 use utils::{UNSET_ID, ID, IDManager, IDType};
@@ -12,6 +13,8 @@ pub struct Game<T: BeingType<T>> {
     active_world_id: ID,
     thread_pool: Pool,
     window: Window,
+    resolution: (u32, u32),
+    aspect_ratio: f32,
 }
 
 impl<T: BeingType<T>> Game<T> {
@@ -19,10 +22,13 @@ impl<T: BeingType<T>> Game<T> {
         let id = ID::new(manager, IDType::World);
         let mut map = HashMap::new();
         map.insert(id, Arc::new(RwLock::new(active_world)));
+        let resolution = window.get_start_resolution();
         Game {
             worlds: map,
             active_world_id: id,
             thread_pool: Pool::new(thread_count),
+            aspect_ratio: resolution.0 as f32 / resolution.1 as f32,
+            resolution: resolution,
             window: window,
         }
     }
@@ -46,6 +52,53 @@ impl<T: BeingType<T>> Game<T> {
             delta_time += now - last_time;
             last_time = now;
             while delta_time > 0.0 {
+                for event in self.window.poll_events() {
+                    match event {
+                        WindowEvent::Resized(width, height) => {
+                            self.resolution = (width, height);
+                            self.aspect_ratio = (width as f32 / height as f32);
+                        },
+                        WindowEvent::Moved(x, y) => {
+
+                        },
+                        WindowEvent::Closed => {
+
+                        },
+                        WindowEvent::DroppedFile(path_buffer) => {
+
+                        },
+                        WindowEvent::ReceivedCharacter(character) => {
+
+                        },
+                        WindowEvent::Focused(focused) => {
+
+                        },
+                        WindowEvent::KeyboardInput(element_state, key_code, virtual_key_code) => {
+
+                        },
+                        WindowEvent::MouseMoved((x, y)) => {
+
+                        },
+                        WindowEvent::MouseWheel(mouse_scroll_data) => {
+
+                        },
+                        WindowEvent::MouseInput(element_state, mouse_button) => {
+
+                        },
+                        WindowEvent::Awakened => {
+
+                        },
+                        WindowEvent::Refresh => {
+
+                        },
+                        WindowEvent::Suspended(suspended) => {
+
+                        },
+                        WindowEvent::Touch(touch) => {
+
+                        },
+                    }
+                }
                 self.tick(manager, tps_s as f32);
                 delta_time -= tps_s;
                 ticks += 1;

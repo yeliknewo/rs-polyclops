@@ -79,13 +79,15 @@ impl BeingMouse {
             true => MyBeingType::MouseBase,
             false => MyBeingType::Mouse,
         };
+        let id = ID::new(manager, IDType::Being);
+        println!("{}", id);
         BeingMouse {
             being_type: being_type,
             entity: Entity::new(manager),
             pos: Vec3::zero(),
             vel: Vec3::zero(),
             acc: Vec3::zero(),
-            id: ID::new(manager, IDType::Being),
+            id: id,
             base: base,
         }
     }

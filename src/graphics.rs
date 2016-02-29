@@ -1,4 +1,4 @@
-use glium::backend::glutin_backend::{GlutinFacade};
+use glium::backend::glutin_backend::{GlutinFacade, PollEventsIter};
 use glium::texture::texture2d::{Texture2d};
 use glium::texture::{RawImage2d};
 use glium::glutin::{WindowBuilder, get_primary_monitor};
@@ -21,6 +21,7 @@ pub struct Window {
     perspective_mat4s: HashMap<ID, Mat4>,
     view_mat4s: HashMap<ID, Mat4>,
     model_mat4s: HashMap<ID, Mat4>,
+    resolution: (u32, u32),
 }
 
 impl Window {
@@ -80,6 +81,7 @@ impl Window {
                     perspective_mat4s: HashMap::new(),
                     view_mat4s: HashMap::new(),
                     model_mat4s: HashMap::new(),
+                    resolution: resolution,
                 }
             },
             WindowArgs::Borderless(title) => {
@@ -103,22 +105,22 @@ impl Window {
                     perspective_mat4s: HashMap::new(),
                     view_mat4s: HashMap::new(),
                     model_mat4s: HashMap::new(),
+                    resolution: resolution,
                 }
             },
         }
+    }
+
+    pub fn get_start_resolution(&self) -> (u32, u32) {
+        self.resolution
     }
 
     pub fn frame(&mut self) -> Frame {
         Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters, &mut self.perspective_mat4s, &mut self.view_mat4s, &mut self.model_mat4s)
     }
 
-    pub fn poll_events(&mut self) {
-        for event in self.facade.poll_events() {
-            match event {
-                glium::glutin::Event::Closed => panic!("Exiting The Lazy Way"),
-                _ => (),
-            }
-        }
+    pub fn poll_events(&mut self) -> PollEventsIter {
+        self.facade.poll_events()
     }
 
     pub fn set_vertices(&mut self, entity: &Entity, vertices: Vec<Vertex>) {
