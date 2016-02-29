@@ -10,18 +10,12 @@ pub struct Vec3 {
 }
 
 impl Vec3 {
-	pub fn from_vals(vals: [f32; 3]) -> Vec3 {
-		Vec3{
-			vals: vals,
-		}
-	}
-
 	pub fn zero() -> Vec3 {
-		Vec3::from_vals([0.0; 3])
+		Vec3::from([0.0; 3])
 	}
 
 	pub fn one() -> Vec3 {
-		Vec3::from_vals([1.0; 3])
+		Vec3::from([1.0; 3])
 	}
 
 	pub fn get_vals(&self) -> [f32; 3] {
@@ -36,6 +30,14 @@ impl Vec3 {
 		}
 
 		sum
+	}
+}
+
+impl From<[f32; 3]> for Vec3 {
+	fn from(vals: [f32; 3]) -> Vec3 {
+		Vec3{
+			vals: vals,
+		}
 	}
 }
 
@@ -63,7 +65,7 @@ impl Add<Vec3> for Vec3 {
 	type Output = Vec3;
 
 	fn add(self, other: Vec3) -> Vec3 {
-		Vec3::from_vals([self[0] + other[0], self[1] + other[1], self[2] + other[2]])
+		Vec3::from([self[0] + other[0], self[1] + other[1], self[2] + other[2]])
 	}
 }
 
@@ -71,7 +73,7 @@ impl Sub<Vec3> for Vec3 {
 	type Output = Vec3;
 
 	fn sub(self, other: Vec3) -> Vec3 {
-		Vec3::from_vals([self[0] - other[0], self[1] - other[1], self[2] - other[2]])
+		Vec3::from([self[0] - other[0], self[1] - other[1], self[2] - other[2]])
 	}
 }
 
@@ -95,6 +97,6 @@ impl Mul<Vec3> for Vec3 {
 	type Output = Vec3;
 
 	fn mul(self, other: Vec3) -> Vec3 {
-		Vec3::from_vals([self[0] * other[0], self[1] * other[1], self[2] * other[2]])
+		Vec3::from([self[0] * other[0], self[1] * other[1], self[2] * other[2]])
 	}
 }

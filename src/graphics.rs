@@ -7,7 +7,9 @@ use glium;
 use image::{load_from_memory};
 use std::collections::{HashMap};
 use math::{Mat4, Vec2, Vec3};
-use utils::{Index, ID, IDType, IDManager};
+use utils::{ID, IDType, EntityIDType, IDManager};
+
+pub type Index = u32;
 
 pub struct Window {
     facade: GlutinFacade,
@@ -118,6 +120,137 @@ impl Window {
             }
         }
     }
+
+    pub fn set_vertices(&mut self, entity: &Entity, vertices: Vec<Vertex>) {
+        self.vertex_buffers.insert(entity.vertex_id, VertexBuffer::new(&self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
+    }
+
+    pub fn set_texture(&mut self, entity: &Entity, data: &[u8]) {
+        let texture = load_from_memory(data).expect("Error Loading Image").to_rgba();
+        self.texture_buffers.insert(entity.texture_id, Texture2d::new(&self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
+    }
+
+    pub fn set_indices(&mut self, entity: &Entity, indices: Vec<Index>) {
+        self.index_buffers.insert(entity.index_id, IndexBuffer::new(&self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
+    }
+
+    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective_matrix: Mat4) {
+        self.perspective_mat4s.insert(entity.perspective_id, perspective_matrix);
+    }
+
+    pub fn set_view_matrix(&mut self, entity: &Entity, view_matrix: Mat4) {
+        self.view_mat4s.insert(entity.view_id, view_matrix);
+    }
+
+    pub fn set_model_matrix(&mut self, entity: &Entity, model_matrix: Mat4){
+        self.model_mat4s.insert(entity.model_id, model_matrix);
+    }
+
+    pub fn set_default_draw_parameters(&mut self, entity: &Entity) {
+        self.set_draw_parameters(entity,
+            glium::DrawParameters {
+            depth: glium::Depth {
+                test: glium::draw_parameters::DepthTest::IfLess,
+                write: true,
+                .. Default::default()
+            },
+            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+            .. Default::default()
+            }
+        );
+    }
+
+    pub fn set_draw_parameters(&mut self, entity: &Entity, draw_parameters: DrawParameters<'static>) {
+        self.draw_parameters.insert(entity.draw_parameters_id, draw_parameters);
+    }
+
+    pub fn set_entity_as_polygon(&mut self, entity: &Entity, points: Vec<Vec2>) {
+        let mut vertices = vec!();
+        for vec2 in points {
+            vertices.push(Vertex::from(vec2));
+        }
+        let mut indices: Vec<Index> = vec!();
+        for i in 1..vertices.len() - 1 {
+            indices.push((i + 1) as Index);
+            indices.push(i as Index);
+            indices.push(0 as Index);
+        }
+        self.set_vertices(entity, vertices);
+        self.set_indices(entity, indices);
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+pub enum DrawMethod {
+    Both(DepthTestMethod, CullingMethod),
+    Depth(DepthTestMethod),
+    Culling(CullingMethod),
+    Neither,
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+pub enum DepthTestMethod {
+    IfLess,
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+pub enum CullingMethod {
+    Clockwise,
+    CounterClockwise,
+}
+
+pub fn method_to_parameters(method: DrawMethod) -> DrawParameters<'static> {
+    match method {
+        DrawMethod::Both(depth, cull) => {
+            let depth_glium = match depth {
+                DepthTestMethod::IfLess => glium::draw_parameters::DepthTest::IfLess,
+            };
+            let cull_glium = match cull {
+                CullingMethod::Clockwise => glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+                CullingMethod::CounterClockwise => glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+            };
+            glium::DrawParameters {
+                depth: glium::Depth {
+                    test: depth_glium,
+                    write: true,
+                    .. Default::default()
+                },
+                backface_culling: cull_glium,
+                .. Default::default()
+            }
+        },
+        DrawMethod::Depth(depth) => {
+            let depth_glium = match depth {
+                DepthTestMethod::IfLess => glium::draw_parameters::DepthTest::IfLess,
+            };
+            glium::DrawParameters {
+                depth: glium::Depth {
+                    test: depth_glium,
+                    write: true,
+                    .. Default::default()
+                },
+                .. Default::default()
+            }
+        },
+        DrawMethod::Culling(cull) => {
+            let cull_glium = match cull {
+                CullingMethod::Clockwise => glium::draw_parameters::BackfaceCullingMode::CullClockwise,
+                CullingMethod::CounterClockwise => glium::draw_parameters::BackfaceCullingMode::CullCounterClockwise,
+            };
+            glium::DrawParameters {
+                backface_culling: cull_glium,
+                .. Default::default()
+            }
+        },
+        DrawMethod::Neither => {
+            glium::DrawParameters {
+                .. Default::default()
+            }
+        },
+    }
 }
 
 pub enum WindowArgs {
@@ -126,7 +259,6 @@ pub enum WindowArgs {
 }
 
 pub struct Frame<'a> {
-    facade: &'a mut GlutinFacade,
     program: &'a mut Program,
     texture_buffers: &'a mut HashMap<ID, Texture2d>,
     vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>,
@@ -154,7 +286,6 @@ impl<'a> Frame<'a> {
         frame.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
         Frame {
             frame: frame,
-            facade: facade,
             program: program,
             texture_buffers: texture_buffers,
             vertex_buffers: vertex_buffers,
@@ -181,64 +312,6 @@ impl<'a> Frame<'a> {
             .expect("Unable to draw Entity");
     }
 
-    pub fn set_vertices(&mut self, entity: &Entity, vertices: Vec<Vertex>) {
-        self.vertex_buffers.insert(entity.vertex_id, VertexBuffer::new(self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
-    }
-
-    pub fn set_texture(&mut self, entity: &Entity, data: &[u8]) {
-        let texture = load_from_memory(data).expect("Error Loading Image").to_rgba();
-        self.texture_buffers.insert(entity.texture_id, Texture2d::new(self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
-    }
-
-    pub fn set_indices(&mut self, entity: &Entity, indices: Vec<Index>) {
-        self.index_buffers.insert(entity.index_id, IndexBuffer::new(self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
-    }
-
-    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective_matrix: Mat4) {
-        self.perspective_mat4s.insert(entity.perspective_id, perspective_matrix);
-    }
-
-    pub fn set_view_matrix(&mut self, entity: &Entity, view_matrix: Mat4) {
-        self.view_mat4s.insert(entity.view_id, view_matrix);
-    }
-
-    pub fn set_model_matrix(&mut self, entity: &Entity, model_matrix: Mat4){
-        self.model_mat4s.insert(entity.model_id, model_matrix);
-    }
-
-    pub fn set_default_draw_parameters(&mut self, entity: &Entity) {
-        self.set_entity_draw_parameters(entity,
-            glium::DrawParameters {
-            depth: glium::Depth {
-                test: glium::draw_parameters::DepthTest::IfLess,
-                write: true,
-                .. Default::default()
-            },
-            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-            .. Default::default()
-            }
-        );
-    }
-
-    pub fn set_entity_draw_parameters(&mut self, entity: &Entity, draw_parameters: DrawParameters<'static>) {
-        self.draw_parameters.insert(entity.draw_parameters_id, draw_parameters);
-    }
-
-    pub fn set_entity_as_polygon(&mut self, entity: &Entity, points: Vec<Vec2>) {
-        let mut vertices = vec!();
-        for vec2 in points {
-            vertices.push(Vertex::from(vec2));
-        }
-        let mut indices: Vec<Index> = vec!();
-        for i in 1..vertices.len() - 1 {
-            indices.push((i + 1) as Index);
-            indices.push(i as Index);
-            indices.push(0 as Index);
-        }
-        self.set_vertices(entity, vertices);
-        self.set_indices(entity, indices);
-    }
-
     pub fn end(self) {
         self.frame.finish().expect("Unable to Finish Frame");
     }
@@ -257,13 +330,13 @@ pub struct Entity {
 impl Entity {
     pub fn new(manager: &mut IDManager) -> Entity {
         Entity {
-            texture_id: ID::new(manager, IDType::Texture),
-            vertex_id: ID::new(manager, IDType::Vertex),
-            index_id: ID::new(manager, IDType::Index),
-            draw_parameters_id: ID::new(manager, IDType::DrawParameter),
-            perspective_id: ID::new(manager, IDType::Perspective),
-            view_id: ID::new(manager, IDType::View),
-            model_id: ID::new(manager, IDType::Model),
+            texture_id: ID::new(manager, IDType::Entity(EntityIDType::Texture)),
+            vertex_id: ID::new(manager, IDType::Entity(EntityIDType::Vertex)),
+            index_id: ID::new(manager, IDType::Entity(EntityIDType::Index)),
+            draw_parameters_id: ID::new(manager, IDType::Entity(EntityIDType::DrawParameter)),
+            perspective_id: ID::new(manager, IDType::Entity(EntityIDType::Perspective)),
+            view_id: ID::new(manager, IDType::Entity(EntityIDType::View)),
+            model_id: ID::new(manager, IDType::Entity(EntityIDType::Model)),
         }
     }
 
@@ -279,54 +352,54 @@ impl Entity {
         }
     }
 
-    pub fn use_other_id(&mut self, other: &Entity, id_type: IDType) {
+    pub fn use_other_id(&mut self, other: &Entity, id_type: EntityIDType) {
         match id_type {
-            IDType::Vertex => {
+            EntityIDType::Vertex => {
                 self.vertex_id = other.vertex_id;
             },
-            IDType::Index => {
+            EntityIDType::Index => {
                 self.index_id = other.index_id;
             },
-            IDType::Texture => {
+            EntityIDType::Texture => {
                 self.texture_id = other.texture_id;
             },
-            IDType::DrawParameter => {
+            EntityIDType::DrawParameter => {
                 self.draw_parameters_id = other.draw_parameters_id;
             },
-            IDType::Perspective => {
+            EntityIDType::Perspective => {
                 self.perspective_id = other.perspective_id;
             },
-            IDType::View => {
+            EntityIDType::View => {
                 self.view_id = other.view_id;
             },
-            IDType::Model => {
+            EntityIDType::Model => {
                 self.model_id = other.model_id;
             }
         };
     }
 
-    pub fn use_new_id(&mut self, manager: &mut IDManager, id_type: IDType) {
-        let id = ID::new(manager, id_type);
+    pub fn use_new_id(&mut self, manager: &mut IDManager, id_type: EntityIDType) {
+        let id = ID::new(manager, IDType::Entity(id_type));
         match id_type {
-            IDType::Vertex => {
+            EntityIDType::Vertex => {
                 self.vertex_id = id;
             },
-            IDType::Index => {
+            EntityIDType::Index => {
                 self.index_id = id;
             },
-            IDType::Texture => {
+            EntityIDType::Texture => {
                 self.texture_id = id;
             },
-            IDType::DrawParameter => {
+            EntityIDType::DrawParameter => {
                 self.draw_parameters_id = id;
             },
-            IDType::Perspective => {
+            EntityIDType::Perspective => {
                 self.perspective_id = id;
             },
-            IDType::View => {
+            EntityIDType::View => {
                 self.view_id = id;
             },
-            IDType::Model => {
+            EntityIDType::Model => {
                 self.model_id = id;
             },
         }

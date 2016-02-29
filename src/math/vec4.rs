@@ -10,38 +10,40 @@ pub struct Vec4 {
 }
 
 impl Vec4 {
-	pub fn from_vals(vals: [f32; 4]) -> Vec4 {
-		Vec4{
-			vals: vals,
-		}
-	}
-
 	pub fn zero() -> Vec4 {
-		Vec4::from_vals([0.0; 4])
+		Vec4::from([0.0; 4])
 	}
 
 	pub fn one() -> Vec4 {
-		Vec4::from_vals([1.0; 4])
+		Vec4::from([1.0; 4])
 	}
 
 	pub fn x_unit() -> Vec4 {
-		Vec4::from_vals([1.0, 0.0, 0.0, 0.0])
+		Vec4::from([1.0, 0.0, 0.0, 0.0])
 	}
 
 	pub fn y_unit() -> Vec4 {
-		Vec4::from_vals([0.0, 1.0, 0.0, 0.0])
+		Vec4::from([0.0, 1.0, 0.0, 0.0])
 	}
 
 	pub fn z_unit() -> Vec4 {
-		Vec4::from_vals([0.0, 0.0, 1.0, 0.0])
+		Vec4::from([0.0, 0.0, 1.0, 0.0])
 	}
 
 	pub fn w_unit() -> Vec4 {
-		Vec4::from_vals([0.0, 0.0, 0.0, 1.0])
+		Vec4::from([0.0, 0.0, 0.0, 1.0])
 	}
 
 	pub fn get_vals(&self) -> [f32; 4] {
 		self.vals
+	}
+}
+
+impl From<[f32; 4]> for Vec4 {
+	fn from(vals: [f32; 4]) -> Vec4 {
+		Vec4 {
+			vals: vals,
+		}
 	}
 }
 
@@ -69,7 +71,7 @@ impl Add<Vec4> for Vec4{
 	type Output = Vec4;
 
 	fn add(self, other: Vec4) -> Vec4 {
-		Vec4::from_vals([self[0] + other[0], self[1] + other[1], self[2] + other[2], self[3] + other[3]])
+		Vec4::from([self[0] + other[0], self[1] + other[1], self[2] + other[2], self[3] + other[3]])
 	}
 }
 
@@ -77,7 +79,7 @@ impl Sub<Vec4> for Vec4 {
 	type Output = Vec4;
 
 	fn sub(self, other: Vec4) -> Vec4 {
-		Vec4::from_vals([self[0] - other[0], self[1] - other[1], self[2] - other[2], self[3] - other[3]])
+		Vec4::from([self[0] - other[0], self[1] - other[1], self[2] - other[2], self[3] - other[3]])
 	}
 }
 
@@ -101,6 +103,6 @@ impl Mul<Vec4> for Vec4 {
 	type Output = Vec4;
 
 	fn mul(self, other: Vec4) -> Vec4 {
-		Vec4::from_vals([self[0] * other[0], self[1] * other[1], self[2] * other[2], self[3] * other[3]])
+		Vec4::from([self[0] * other[0], self[1] * other[1], self[2] * other[2], self[3] * other[3]])
 	}
 }

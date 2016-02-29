@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
-pub type Index = u32;
+use std::collections::{HashMap};
+use std::fmt::{Display, Formatter, Error};
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ID {
@@ -15,15 +14,28 @@ impl ID {
     }
 }
 
+impl Display for ID {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error>{
+        write!(f, "{}", self.id)
+    }
+}
+
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum IDType {
-    Vertex = 0,
-    Index = 1,
-    Texture = 2,
-    DrawParameter = 3,
-    Perspective = 4,
-    View = 5,
-    Model = 6,
+    Entity(EntityIDType),
+    Being,
+    World,
+}
+
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub enum EntityIDType {
+    Vertex,
+    Index,
+    Texture,
+    DrawParameter,
+    Perspective,
+    View,
+    Model,
 }
 
 pub struct IDManager {
