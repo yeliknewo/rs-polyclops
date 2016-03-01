@@ -1,7 +1,7 @@
 extern crate polyclops;
 
 use std::sync::{Arc, RwLock};
-use polyclops::{UNSET, World, Vec2Event, Vec2, WorldEvent, EntityEvent, EntityBaseEvent, EntityIDType, Window, WindowArgs, Game, Entity, IDManager, Being, BeingType, ID, Vertex, Vec3, Mat4, IDType, DrawMethod, DepthTestMethod, CullingMethod};
+use polyclops::{UNSET, World, Vec2Event, Vec3Event, Vec2, WorldEvent, EntityEvent, EntityBaseEvent, EntityIDType, Window, WindowArgs, Game, Entity, IDManager, Being, BeingType, ID, Vertex, Vec3, Mat4, IDType, DrawMethod, DepthTestMethod, CullingMethod};
 
 pub static RAW_TEXTURE: &'static [u8] = include_bytes!("..\\assets\\texture.png");
 
@@ -51,22 +51,24 @@ impl BeingType<MyBeingType> for MyBeingType {
                         EntityIDType::Model,
                     ))));
                     new_events.push(WorldEvent::Entity(being.get_id(), EntityEvent::Model(Mat4::translation_from_vec3(being.get_pos3()))));
+                    new_events.push(WorldEvent::Pos3(being.get_id(), Vec3Event::Add(Vec3::from([0.0, 0.0, -1.0]))));
                 }
                 world.write().expect("Unable to Write World in MyBeingType Make Being").add_being(being);
             },
             MyBeingType::MouseBase => {
                 let being = Box::new(BeingMouse::new(manager, true));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Vertices(vec!(
-                    Vertex::from(Vec3::from([0.0, 0.0, -1.0])),
-                    Vertex::from(Vec3::from([1.0, 0.0, -1.0])),
-                    Vertex::from(Vec3::from([0.0, 1.0, -1.0]))
+                    Vertex::from(Vec3::from([0.0, 0.0, 0.0])),
+                    Vertex::from(Vec3::from([1.0, -1.0, 0.0])),
+                    Vertex::from(Vec3::from([0.0, -1.0, 0.0]))
                 ))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Indices(vec!(0, 1, 2, 2, 1, 0))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Texture(RAW_TEXTURE)));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::DrawMethod(DrawMethod::Both(DepthTestMethod::IfLess, CullingMethod::Clockwise))));
-                {
-                    new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Perspective(Mat4::perspective(0.1, 100.0, 90.0, world.read().expect("Unable to Read World in MouseBase in Make Being in MyBeingType").get_aspect_ratio()))));
-                }
+                // {
+                //     new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Perspective(Mat4::perspective(0.1, 100.0, 90.0, world.read().expect("Unable to Read World in MouseBase in Make Being in MyBeingType").get_aspect_ratio()))));
+                // }
+                new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Perspective(Mat4::identity())));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::View(Mat4::view(0.0, 0.0, Vec3::from([0.0, 0.0, 0.0])))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Model(Mat4::translation_from_vec3(Vec3::from([0.0, 0.0, 0.0])))));
                 world.write().expect("Unable to Write World in MyBeingType Make Being").set_base_being(being);
