@@ -113,7 +113,6 @@ impl<T: BeingType<T>> Game<T> {
                                 self.resume();
                             } else {
                                 self.pause();
-
                             }
                         },
                         WindowEvent::KeyboardInput(element_state, _, virtual_key_code) => match virtual_key_code {

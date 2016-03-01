@@ -64,7 +64,9 @@ impl BeingType<MyBeingType> for MyBeingType {
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Indices(vec!(0, 1, 2, 2, 1, 0))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Texture(RAW_TEXTURE)));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::DrawMethod(DrawMethod::Both(DepthTestMethod::IfLess, CullingMethod::Clockwise))));
-                new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Perspective(Mat4::perspective(0.1, 100.0, 90.0, 16.0 / 9.0))));
+                {
+                    new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Perspective(Mat4::perspective(0.1, 100.0, 90.0, world.read().expect("Unable to Read World in MouseBase in Make Being in MyBeingType").get_aspect_ratio()))));
+                }
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::View(Mat4::view(0.0, 0.0, Vec3::from([0.0, 0.0, 0.0])))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityBaseEvent::Model(Mat4::translation_from_vec3(Vec3::from([0.0, 0.0, 0.0])))));
                 world.write().expect("Unable to Write World in MyBeingType Make Being").set_base_being(being);
@@ -120,7 +122,7 @@ impl Being<MyBeingType> for BeingMouse {
             vec!()
         } else {
             let mut vec = vec!(WorldEvent::Entity(self.get_id(), EntityEvent::Model(Mat4::translation_from_vec3(self.get_pos3()))));
-            vec.push(WorldEvent::Pos2(self.get_id(), Vec2Event::Set(world.get_mouse_pos())));
+            vec.push(WorldEvent::Pos2(self.get_id(), Vec2Event::Set(world.get_mouse_pos_world())));
             vec
             // let mut vec = vec!(WorldEvent::Entity(self.get_id(), EntityEvent::Model(Mat4::translation_from_vec3(self.get_pos3()))), WorldEvent::Pos2(self.get_id(), Vec2Event::Add(self.get_vel2() * *delta_time)));
             // if self.get_pos3()[0] > 3.0 {

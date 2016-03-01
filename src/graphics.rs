@@ -67,6 +67,7 @@ impl Window {
                     .with_dimensions(width, height)
                     .with_decorations(true)
                     .with_depth_buffer(24)
+                    .with_vsync()
                     .build_glium()
                     .expect("Unable to make Facade");
                 facade.get_window()
@@ -91,6 +92,7 @@ impl Window {
                     .with_dimensions(resolution.0, resolution.1)
                     .with_decorations(false)
                     .with_depth_buffer(24)
+                    .with_vsync()
                     .build_glium()
                     .expect("Unable to make Facade");
                 facade.get_window()

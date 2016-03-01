@@ -14,6 +14,7 @@ pub struct World<T: BeingType<T>> {
     beings: HashMap<ID, Arc<RwLock<Box<Being<T>>>>>,
     base_beings: HashMap<T, Arc<RwLock<Box<Being<T>>>>>,
     mouse_pos: Vec2,
+    mouse_pos_world: Vec2,
     resolution: Vec2,
     aspect_ratio: f32,
     mouse_buttons: HashMap<GliumMouseButton, GliumElementState>,
@@ -26,6 +27,7 @@ impl<T: BeingType<T>> World<T> {
             beings: HashMap::new(),
             base_beings: HashMap::new(),
             mouse_pos: Vec2::zero(),
+            mouse_pos_world: Vec2::zero(),
             resolution: resolution,
             aspect_ratio: resolution[0] / resolution[1],
             mouse_buttons: HashMap::new(),
@@ -72,6 +74,8 @@ impl<T: BeingType<T>> World<T> {
 
     pub fn update_mouse_pos(&mut self, mouse_pos: Vec2) {
         self.mouse_pos = mouse_pos;
+        let x = 1.0 / self.resolution[0];
+        self.mouse_pos_world = self.mouse_pos.clone() * Vec2::from([x, -x / self.aspect_ratio]);
     }
 
     pub fn get_key(&self, key: GliumKeyCode) -> GliumElementState {
@@ -89,8 +93,16 @@ impl<T: BeingType<T>> World<T> {
         self.resolution
     }
 
+    pub fn get_aspect_ratio(&self) -> f32 {
+        self.aspect_ratio
+    }
+
     pub fn get_mouse_pos(&self) -> Vec2 {
         self.mouse_pos
+    }
+
+    pub fn get_mouse_pos_world(&self) -> Vec2 {
+        self.mouse_pos_world
     }
 }
 
