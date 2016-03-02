@@ -159,41 +159,50 @@ impl Mat4 {
 		)
 	}
 
-	pub fn to_inverse(&self) -> Option<Mat4> {
+	pub fn to_inverse(&self) -> Mat4 {
 		let mut me = self.clone();
 		let mut other = Mat4::identity();
+		let mut real_y = 0;
 		for x in 0..4 {
-			for y in 0..4 {
+			for y in real_y..4 {
 				if me[y][x] != 0.0 {
-					if y != 0 {
-						me.swap_rows(y, 0);
-						other.swap_rows(y, 0);
+					me.swap_rows(y, real_y);
+					other.swap_rows(y, real_y);
+					let multiple = 1.0 / me[real_y][x];
+					me.scale_row(real_y, multiple);
+					other.scale_row(real_y, multiple);
+					for y2 in real_y + 1..4 {
+						let multiple = -me[y2][x];
+						me.add_row(y2, real_y, multiple);
+						other.add_row(y2, real_y, multiple);
 					}
-					let multiple = (1.0 / me[0][x]);
-					me[0] = me[0] * multiple;
-					other[0] = other[0] * multiple;
-					for y2 in y..4 {
-						let additive = me[0] * me[]
-						me[y2] = me[y2] + additive;
-					}
+					real_y += 1;
+					break;
 				}
 			}
 		}
-		Some(other)
-	}
-
-	fn get_at(&self, y: usize, x: usize) -> f32 {
-		self.vals[y][x]
-	}
-
-	fn set_at(&mut self, y: usize, x: usize, value: f32) {
-		self.vals[y][x] = value;
+		for x in 1..4 {
+			for y in 0..x {
+				let multiple = -me[y][x];
+				me.add_row(y, x, multiple);
+				other.add_row(y, x, multiple);
+			}
+		}
+		other
 	}
 
 	fn swap_rows(&mut self, y1: usize, y2: usize) {
 		let row = self[y1];
 		self[y1] = self[y2];
 		self[y2] = row;
+	}
+
+	fn scale_row(&mut self, y1: usize, scalar: f32) {
+		self[y1] = self[y1] * scalar;
+	}
+
+	fn add_row(&mut self, y1: usize, y2: usize, scalar: f32) {
+		self[y1] = self[y1] + self[y2] * scalar;
 	}
 
 	fn get_vals(&self) -> [[f32; 4]; 4] {

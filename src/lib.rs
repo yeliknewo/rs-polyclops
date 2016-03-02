@@ -18,7 +18,7 @@ pub use self::graphics::{Window, WindowArgs, Entity, Vertex, Index, Frame, DrawM
 pub use self::utils::{UNSET, ID, IDManager, IDType, EntityIDType};
 pub use self::math::{Mat4, Vec2, Vec3, Vec4};
 pub use self::being::{Being, BeingType};
-pub use self::world::{World, WorldEvent, EntityEvent, EntityBaseEvent, Vec2Event, Vec3Event};
+pub use self::world::{World, WorldEvent, EntityEvent, Vec2Event, Vec3Event};
 pub use self::game::{Game};
 pub use self::keyboard::{Keyboard};
 

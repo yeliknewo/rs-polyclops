@@ -20,8 +20,11 @@ pub struct Window {
     index_buffers: HashMap<ID, IndexBuffer<Index>>,
     draw_parameters: HashMap<ID, DrawParameters<'static>>,
     perspective_mat4s: HashMap<ID, Mat4>,
+    perspective_inverse: HashMap<ID, Mat4>,
     view_mat4s: HashMap<ID, Mat4>,
+    view_inverse: HashMap<ID, Mat4>,
     model_mat4s: HashMap<ID, Mat4>,
+    model_inverse: HashMap<ID, Mat4>,
     resolution: (u32, u32),
 }
 
@@ -81,8 +84,11 @@ impl Window {
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
                     perspective_mat4s: HashMap::new(),
+                    perspective_inverse: HashMap::new(),
                     view_mat4s: HashMap::new(),
+                    view_inverse: HashMap::new(),
                     model_mat4s: HashMap::new(),
+                    model_inverse: HashMap::new(),
                     resolution: resolution,
                 }
             },
@@ -106,8 +112,11 @@ impl Window {
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
                     perspective_mat4s: HashMap::new(),
+                    perspective_inverse: HashMap::new(),
                     view_mat4s: HashMap::new(),
+                    view_inverse: HashMap::new(),
                     model_mat4s: HashMap::new(),
+                    model_inverse: HashMap::new(),
                     resolution: resolution,
                 }
             },
@@ -139,15 +148,15 @@ impl Window {
         self.index_buffers.insert(entity.index_id, IndexBuffer::new(&self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
     }
 
-    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective_matrix: Mat4) {
+    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective_matrix: Mat4, perspective_matrix_inverse: Mat4) {
         self.perspective_mat4s.insert(entity.perspective_id, perspective_matrix);
     }
 
-    pub fn set_view_matrix(&mut self, entity: &Entity, view_matrix: Mat4) {
+    pub fn set_view_matrix(&mut self, entity: &Entity, view_matrix: Mat4, view_matrix_inverse: Mat4) {
         self.view_mat4s.insert(entity.view_id, view_matrix);
     }
 
-    pub fn set_model_matrix(&mut self, entity: &Entity, model_matrix: Mat4){
+    pub fn set_model_matrix(&mut self, entity: &Entity, model_matrix: Mat4, model_matrix_inverse: Mat4) {
         self.model_mat4s.insert(entity.model_id, model_matrix);
     }
 

@@ -146,24 +146,24 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             EntityEvent::Indices(_) => 1,
             EntityEvent::Texture(_) => 1,
             EntityEvent::DrawMethod(_) => 1,
-            EntityEvent::Perspective(_) => 1,
-            EntityEvent::View(_) => 1,
-            EntityEvent::Model(_) => 1,
+            EntityEvent::Perspective(_, _) => 1,
+            EntityEvent::View(_, _) => 1,
+            EntityEvent::Model(_, _) => 1,
             EntityEvent::UseNewID(_) => 2,
             EntityEvent::UseOldID(_, _) => 2,
             EntityEvent::UseBaseID(_, _) => 2,
         },
-        WorldEvent::EntityBase(_, entity_base_event) => match entity_base_event {
-            EntityBaseEvent::Vertices(_) => 1,
-            EntityBaseEvent::Indices(_) => 1,
-            EntityBaseEvent::Texture(_) => 1,
-            EntityBaseEvent::DrawMethod(_) => 1,
-            EntityBaseEvent::Perspective(_) => 1,
-            EntityBaseEvent::View(_) => 1,
-            EntityBaseEvent::Model(_) => 1,
-            EntityBaseEvent::UseNewID(_) => 2,
-            EntityBaseEvent::UseOldID(_, _) => 2,
-            EntityBaseEvent::UseBaseID(_, _) => 2,
+        WorldEvent::EntityBase(_, entity_event) => match entity_event {
+            EntityEvent::Vertices(_) => 1,
+            EntityEvent::Indices(_) => 1,
+            EntityEvent::Texture(_) => 1,
+            EntityEvent::DrawMethod(_) => 1,
+            EntityEvent::Perspective(_, _) => 1,
+            EntityEvent::View(_, _) => 1,
+            EntityEvent::Model(_, _) => 1,
+            EntityEvent::UseNewID(_) => 2,
+            EntityEvent::UseOldID(_, _) => 2,
+            EntityEvent::UseBaseID(_, _) => 2,
         },
     }
 }
@@ -180,22 +180,7 @@ pub enum WorldEvent<T: BeingType<T>> {
     Acc2(ID, Vec2Event),
     Acc3(ID, Vec3Event),
     Entity(ID, EntityEvent<T>),
-    EntityBase(T, EntityBaseEvent<T>),
-}
-
-#[allow(dead_code)]
-#[derive(Clone)]
-pub enum EntityBaseEvent<T: BeingType<T>> {
-    Vertices(Vec<Vertex>),
-    Indices(Vec<Index>),
-    Texture(&'static [u8]),
-    DrawMethod(DrawMethod),
-    Perspective(Mat4),
-    View(Mat4),
-    Model(Mat4),
-    UseNewID(Vec<EntityIDType>),
-    UseOldID(ID, Vec<EntityIDType>),
-    UseBaseID(T, Vec<EntityIDType>),
+    EntityBase(T, EntityEvent<T>),
 }
 
 #[allow(dead_code)]
@@ -205,9 +190,9 @@ pub enum EntityEvent<T: BeingType<T>> {
     Indices(Vec<Index>),
     Texture(&'static [u8]),
     DrawMethod(DrawMethod),
-    Perspective(Mat4),
-    View(Mat4),
-    Model(Mat4),
+    Perspective(Mat4, Mat4),
+    View(Mat4, Mat4),
+    Model(Mat4, Mat4),
     UseNewID(Vec<EntityIDType>),
     UseOldID(ID, Vec<EntityIDType>),
     UseBaseID(T, Vec<EntityIDType>),

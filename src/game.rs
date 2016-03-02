@@ -8,7 +8,7 @@ use scoped_threadpool::{Pool};
 use time::{precise_time_s};
 
 use utils::{UNSET_ID, ID, IDManager, IDType};
-use world::{World, WorldEvent, EntityEvent, EntityBaseEvent, Vec2Event, Vec3Event, get_rank};
+use world::{World, WorldEvent, EntityEvent, Vec2Event, Vec3Event, get_rank};
 use graphics::{Window, method_to_parameters};
 use being::{BeingType, Being};
 use math::{Vec2};
@@ -349,17 +349,17 @@ impl<T: BeingType<T>> Game<T> {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     window.set_draw_parameters(world.get_being(id).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
                                 },
-                                EntityEvent::Perspective(perspective) => {
+                                EntityEvent::Perspective(perspective, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_perspective_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
+                                    window.set_perspective_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective, inverse);
                                 },
-                                EntityEvent::View(view) => {
+                                EntityEvent::View(view, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_view_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
+                                    window.set_view_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view, inverse);
                                 },
-                                EntityEvent::Model(model) => {
+                                EntityEvent::Model(model, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_model_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
+                                    window.set_model_matrix(world.get_being(id).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model, inverse);
                                 },
                                 EntityEvent::UseNewID(id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
@@ -391,35 +391,35 @@ impl<T: BeingType<T>> Game<T> {
                                 }
                             },
                             WorldEvent::EntityBase(being_type, entity_base_event) => match entity_base_event {
-                                EntityBaseEvent::Vertices(vertices) => {
+                                EntityEvent::Vertices(vertices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     window.set_vertices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Vertices in Execute Events").write().expect("Unable to Write Being Set Vertices in Execute Events").get_entity_mut(), vertices);
                                 },
-                                EntityBaseEvent::Indices(indices) => {
+                                EntityEvent::Indices(indices) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     window.set_indices(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Indices in Execute Events").write().expect("Unable to Write Being in Set Indices in Execute Events").get_entity_mut(), indices);
                                 },
-                                EntityBaseEvent::Texture(texture) => {
+                                EntityEvent::Texture(texture) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     window.set_texture(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Texture in Execute Events").write().expect("Unable to Write Being in Set Texture in Execute Events").get_entity_mut(), texture);
                                 },
-                                EntityBaseEvent::DrawMethod(draw_method) => {
+                                EntityEvent::DrawMethod(draw_method) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     window.set_draw_parameters(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Draw Method in Execute Events").write().expect("Unable to Write Being in Set DrawMethod in Execute Events").get_entity_mut(), method_to_parameters(draw_method));
                                 },
-                                EntityBaseEvent::Perspective(perspective) => {
+                                EntityEvent::Perspective(perspective, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_perspective_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective);
+                                    window.set_perspective_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Perspective in Execute Events").write().expect("Unable to Write Being in Set Perspective in Execute Events").get_entity_mut(), perspective, inverse);
                                 },
-                                EntityBaseEvent::View(view) => {
+                                EntityEvent::View(view, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_view_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view);
+                                    window.set_view_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set View in Execute Events").write().expect("Unable to Write Being in Set View in Execute Events").get_entity_mut(), view, inverse);
                                 },
-                                EntityBaseEvent::Model(model) => {
+                                EntityEvent::Model(model, inverse) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                    window.set_model_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model);
+                                    window.set_model_matrix(world.get_base_being(being_type).expect("Unable to Get Being in Entity Set Model in Execute Events").write().expect("Unable to Write Being in Set Model in Execute Events").get_entity_mut(), model, inverse);
                                 },
-                                EntityBaseEvent::UseNewID(id_types) => {
+                                EntityEvent::UseNewID(id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     let mut being = world.get_base_being(being_type).expect("Unable to Get Being in Entity Use New ID in Execute Events").write().expect("Unable to Write Being in New ID in Execute Events");
                                     let mut entity = being.get_entity_mut();
@@ -427,7 +427,7 @@ impl<T: BeingType<T>> Game<T> {
                                         entity.use_new_id(manager, id_type);
                                     }
                                 },
-                                EntityBaseEvent::UseOldID(your_id, id_types) => {
+                                EntityEvent::UseOldID(your_id, id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     let mut my_being = world.get_base_being(being_type).expect("Unable to Get Being(my being) in Entity Use Old ID in Execute Events").write().expect("Unable to Write Being in Old ID in Execute Events");
                                     let mut my_entity = my_being.get_entity_mut();
@@ -437,7 +437,7 @@ impl<T: BeingType<T>> Game<T> {
                                         my_entity.use_other_id(your_entity, id_type);
                                     }
                                 },
-                                EntityBaseEvent::UseBaseID(your_being_type, id_types) => {
+                                EntityEvent::UseBaseID(your_being_type, id_types) => {
                                     let world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                     let mut my_being = world.get_base_being(being_type).expect("Unable to Get Being(my being) in Entity Use Base ID in Execute Events").write().expect("Unable to Write Being in Old ID in Execute Events");
                                     let mut my_entity = my_being.get_entity_mut();
