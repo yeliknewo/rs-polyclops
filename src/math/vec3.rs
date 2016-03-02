@@ -111,6 +111,14 @@ impl Mul<Vec3> for Vec3 {
 	}
 }
 
+impl Mul<f32> for Vec3 {
+	type Output = Vec3;
+
+	fn mul(self, other: f32) -> Vec3 {
+		Vec3::from([self[0] * other, self[1] * other, self[2] * other])
+	}
+}
+
 impl Display for Vec3 {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error>{
         write!(f, "({}, {}, {})", self[0], self[1], self[2])

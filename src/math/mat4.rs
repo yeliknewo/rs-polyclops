@@ -5,7 +5,7 @@ use glium::uniforms::{AsUniformValue, UniformValue};
 use math::{Vec3, Vec4};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct Mat4{
+pub struct Mat4 {
 	vals: [Vec4; 4],
 }
 
@@ -157,6 +157,43 @@ impl Mat4 {
 				]
 			]
 		)
+	}
+
+	pub fn to_inverse(&self) -> Option<Mat4> {
+		let mut me = self.clone();
+		let mut other = Mat4::identity();
+		for x in 0..4 {
+			for y in 0..4 {
+				if me[y][x] != 0.0 {
+					if y != 0 {
+						me.swap_rows(y, 0);
+						other.swap_rows(y, 0);
+					}
+					let multiple = (1.0 / me[0][x]);
+					me[0] = me[0] * multiple;
+					other[0] = other[0] * multiple;
+					for y2 in y..4 {
+						let additive = me[0] * me[]
+						me[y2] = me[y2] + additive;
+					}
+				}
+			}
+		}
+		Some(other)
+	}
+
+	fn get_at(&self, y: usize, x: usize) -> f32 {
+		self.vals[y][x]
+	}
+
+	fn set_at(&mut self, y: usize, x: usize, value: f32) {
+		self.vals[y][x] = value;
+	}
+
+	fn swap_rows(&mut self, y1: usize, y2: usize) {
+		let row = self[y1];
+		self[y1] = self[y2];
+		self[y2] = row;
 	}
 
 	fn get_vals(&self) -> [[f32; 4]; 4] {
