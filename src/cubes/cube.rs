@@ -42,7 +42,7 @@ pub fn make_cube(manager: &mut IDManager, events: &mut Vec<WorldEvent<CBT>>) -> 
 }
 
 struct BeingCube {
-    entity: Entity,
+    entity: Vec<Entity>,
     pos: Vec3,
     vel: Vec3,
     acc: Vec3,
@@ -52,7 +52,7 @@ struct BeingCube {
 impl BeingCube {
     fn new(manager: &mut IDManager) -> BeingCube {
         BeingCube {
-            entity: Entity::new(manager),
+            entity: vec!(),
             pos: Vec3::zero(),
             vel: Vec3::zero(),
             acc: Vec3::zero(),
@@ -70,8 +70,8 @@ impl Being<CBT> for BeingCube {
         self.id
     }
 
-    fn get_entity(&self) -> &Entity {
-        &self.entity
+    fn get_entities(&self) -> &Vec<Entity> {
+        &self.entities
     }
 
     fn tick(&self, world: &World<CBT>, delta_time: &f32, transforms: &Transforms) -> Vec<WorldEvent<CBT>> {
@@ -90,8 +90,8 @@ impl Being<CBT> for BeingCube {
         self.acc
     }
 
-    fn get_entity_mut(&mut self) -> &mut Entity {
-        &mut self.entity
+    fn get_entities_mut(&mut self) -> &mut Vec<Entity> {
+        &mut self.entities
     }
 
     fn set_pos3(&mut self, vec3: Vec3) {
