@@ -122,50 +122,21 @@ impl Window {
         self.facade.poll_events()
     }
 
-    pub fn set_vertices(&mut self, entity: &Entity, vertices: Vec<Vertex>) {
-        self.vertex_buffers.insert(entity.vertex_id, VertexBuffer::new(&self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
+    pub fn set_vertices(&mut self, entity: &Arc<RwLock<Entity>>, vertices: Vec<Vertex>) {
+        self.vertex_buffers.insert(entity.read().expect("Unable to Read Entity in Set Vertices").vertex_id, VertexBuffer::new(&self.facade, &vertices).expect("Failed to Create Vertex Buffer"));
     }
 
-    pub fn set_texture(&mut self, entity: &Entity, data: &[u8]) {
+    pub fn set_indices(&mut self, entity: &Arc<RwLock<Entity>>, indices: Vec<Index>) {
+        self.index_buffers.insert(entity.read().expect("Unable to Read Entity in Set Indices").index_id, IndexBuffer::new(&self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
+    }
+
+    pub fn set_texture(&mut self, entity: &Arc<RwLock<Entity>>, data: &[u8]) {
         let texture = load_from_memory(data).expect("Error Loading Image").to_rgba();
-        self.texture_buffers.insert(entity.texture_id, Texture2d::new(&self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
+        self.texture_buffers.insert(entity.read().expect("Unable to Read Entity in Set Texture").texture_id, Texture2d::new(&self.facade, RawImage2d::from_raw_rgba_reversed(texture.clone().into_raw(), texture.dimensions())).expect("Unable to make Texture"));
     }
 
-    pub fn set_indices(&mut self, entity: &Entity, indices: Vec<Index>) {
-        self.index_buffers.insert(entity.index_id, IndexBuffer::new(&self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
-    }
-
-    pub fn set_default_draw_parameters(&mut self, entity: &Entity) {
-        self.set_draw_parameters(entity,
-            glium::DrawParameters {
-            depth: glium::Depth {
-                test: glium::draw_parameters::DepthTest::IfLess,
-                write: true,
-                .. Default::default()
-            },
-            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockwise,
-            .. Default::default()
-            }
-        );
-    }
-
-    pub fn set_draw_parameters(&mut self, entity: &Entity, draw_parameters: DrawParameters<'static>) {
-        self.draw_parameters.insert(entity.draw_parameters_id, draw_parameters);
-    }
-
-    pub fn set_entity_as_polygon(&mut self, entity: &Entity, points: Vec<Vec2>) {
-        let mut vertices = vec!();
-        for vec2 in points {
-            vertices.push(Vertex::from(vec2));
-        }
-        let mut indices: Vec<Index> = vec!();
-        for i in 1..vertices.len() - 1 {
-            indices.push((i + 1) as Index);
-            indices.push(i as Index);
-            indices.push(0 as Index);
-        }
-        self.set_vertices(entity, vertices);
-        self.set_indices(entity, indices);
+    pub fn set_draw_parameters(&mut self, entity: &Arc<RwLock<Entity>>, draw_parameters: DrawParameters<'static>) {
+        self.draw_parameters.insert(entity.read().expect("Unable to Read Entity in Set Draw Parameters").draw_parameters_id, draw_parameters);
     }
 }
 
@@ -277,7 +248,8 @@ impl<'a> Frame<'a> {
         }
     }
 
-    pub fn draw_entity(&mut self, entity: &Entity,transforms: &Arc<RwLock<Transforms>>) {
+    pub fn draw_entity(&mut self, entity_arc: &Arc<RwLock<Entity>>, transforms: &Arc<RwLock<Transforms>>) {
+        let entity = entity_arc.read().expect("Unable to Read Entity in Draw Entity");
         self.frame.draw(
             &self.vertex_buffers[&entity.vertex_id],
             &self.index_buffers[&entity.index_id],
@@ -342,9 +314,9 @@ impl Transforms {
         &self.perspective_mat4s
     }
 
-    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective: Mat4, inverse: Mat4) {
-        self.perspective_mat4s.insert(entity.perspective_id, perspective);
-        self.perspective_mat4s_inverse.insert(entity.perspective_id, inverse);
+    pub fn set_perspective_matrix(&mut self, entity: &Arc<RwLock<Entity>>, perspective: Mat4, inverse: Mat4) {
+        self.perspective_mat4s.insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, perspective);
+        self.perspective_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, inverse);
     }
 
     pub fn get_view_matrix(&self, entity: &Entity) -> Mat4 {
@@ -359,9 +331,9 @@ impl Transforms {
         &self.view_mat4s
     }
 
-    pub fn set_view_matrix(&mut self, entity: &Entity, view: Mat4, inverse: Mat4) {
-        self.view_mat4s.insert(entity.view_id, view);
-        self.view_mat4s_inverse.insert(entity.view_id, inverse);
+    pub fn set_view_matrix(&mut self, entity: &Arc<RwLock<Entity>>, view: Mat4, inverse: Mat4) {
+        self.view_mat4s.insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, view);
+        self.view_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, inverse);
     }
 
     pub fn get_model_matrix(&self, entity: &Entity) -> Mat4 {
@@ -376,9 +348,9 @@ impl Transforms {
         &self.model_mat4s
     }
 
-    pub fn set_model_matrix(&mut self, entity: &Entity, model: Mat4, inverse: Mat4) {
-        self.model_mat4s.insert(entity.model_id, model);
-        self.model_mat4s_inverse.insert(entity.model_id, inverse);
+    pub fn set_model_matrix(&mut self, entity: &Arc<RwLock<Entity>>, model: Mat4, inverse: Mat4) {
+        self.model_mat4s.insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, model);
+        self.model_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, inverse);
     }
 }
 
@@ -417,7 +389,8 @@ impl Entity {
         }
     }
 
-    pub fn use_other_id(&mut self, other: &Entity, id_type: EntityIDType) {
+    pub fn use_other_id(&mut self, other_arc: &Arc<RwLock<Entity>>, id_type: EntityIDType) {
+        let other = other_arc.read().expect("Unable to Read Other in Use Other ID");
         match id_type {
             EntityIDType::Vertex => {
                 self.vertex_id = other.vertex_id;

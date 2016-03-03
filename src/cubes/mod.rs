@@ -35,7 +35,7 @@ pub fn main() {
 impl BeingType<CBT> for CBT {
     fn make_being(manager: &mut IDManager, being_type: CBT, events: &mut Vec<WorldEvent<CBT>>, window: &mut Window, game: &mut Game<CBT>, world: Arc<RwLock<World<CBT>>>) {
         let mut results = match being_type {
-            CBT::Cube => cube::make_cube(manager, events),
+            CBT::Cube => cube::make_cube(manager, events, world.clone()),
         };
         world.write().expect("Unable to Write World in Make Cube").add_being(results.0);
         game.execute_events(manager, window, &mut results.1, world);

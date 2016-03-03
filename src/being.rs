@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 use std::hash::{Hash};
+use std::collections::{HashMap};
 
 use utils::{ID, IDManager};
 use graphics::{Entity, Window, Transforms};
@@ -15,7 +16,10 @@ pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Has
 pub trait Being<T: BeingType<T>>: Send + Sync {
     fn get_type(&self) -> T;
     fn get_id(&self) -> ID;
-    fn get_entity(&self) -> &Entity;
+    fn get_entity(&self, id: ID) -> Option<&Arc<RwLock<Entity>>> {
+        self.get_entities().get(&id)
+    }
+    fn get_entities(&self) -> &HashMap<ID, Arc<RwLock<Entity>>>;
     fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<WorldEvent<T>>;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())
@@ -30,7 +34,6 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
     }
     fn get_acc3(&self) -> Vec3;
 
-    fn get_entity_mut(&mut self) -> &mut Entity;
     fn set_pos2(&mut self, vec2: Vec2) {
         let z = self.get_pos3()[2];
         self.set_pos3(vec2.to_vec3(z));

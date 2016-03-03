@@ -51,8 +51,8 @@ impl<T: BeingType<T>> World<T> {
         self.beings.get(&id)
     }
 
-    pub fn set_base(&mut self, being_type: T, entity: Entity) {
-        self.bases.insert(being_type, Arc::new(RwLock::new(entity)));
+    pub fn set_base(&mut self, being_type: T, entity: Arc<RwLock<Entity>>) {
+        self.bases.insert(being_type, entity);
     }
 
     pub fn get_base(&self, being_type: T) -> Option<&Arc<RwLock<Entity>>> {
@@ -145,7 +145,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             Vec3Event::Add(_) => 16,
             Vec3Event::Mul(_) => 17,
         },
-        WorldEvent::Entity(_, entity_event) => match entity_event {
+        WorldEvent::Entity(_, _, entity_event) => match entity_event {
             EntityEvent::Vertices(_) => 1,
             EntityEvent::Indices(_) => 1,
             EntityEvent::Texture(_) => 1,
@@ -154,7 +154,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             EntityEvent::View(_, _) => 1,
             EntityEvent::Model(_, _) => 1,
             EntityEvent::UseNewID(_) => 2,
-            EntityEvent::UseOldID(_, _) => 2,
+            EntityEvent::UseOldID(_, _, _) => 2,
             EntityEvent::UseBaseID(_, _) => 2,
         },
         WorldEvent::EntityBase(_, entity_event) => match entity_event {
@@ -166,7 +166,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             EntityEvent::View(_, _) => 1,
             EntityEvent::Model(_, _) => 1,
             EntityEvent::UseNewID(_) => 2,
-            EntityEvent::UseOldID(_, _) => 2,
+            EntityEvent::UseOldID(_, _, _) => 2,
             EntityEvent::UseBaseID(_, _) => 2,
         },
     }
@@ -183,7 +183,7 @@ pub enum WorldEvent<T: BeingType<T>> {
     Vel3(ID, Vec3Event),
     Acc2(ID, Vec2Event),
     Acc3(ID, Vec3Event),
-    Entity(ID, EntityEvent<T>),
+    Entity(ID, ID, EntityEvent<T>),
     EntityBase(T, EntityEvent<T>),
 }
 
@@ -198,7 +198,7 @@ pub enum EntityEvent<T: BeingType<T>> {
     View(Mat4, Mat4),
     Model(Mat4, Mat4),
     UseNewID(Vec<EntityIDType>),
-    UseOldID(ID, Vec<EntityIDType>),
+    UseOldID(ID, ID, Vec<EntityIDType>),
     UseBaseID(T, Vec<EntityIDType>),
 }
 
