@@ -8,7 +8,7 @@ use image::{load_from_memory};
 use std::collections::{HashMap};
 use std::sync::{Arc, RwLock};
 
-use math::{Mat4, Vec2, Vec3};
+use math::{Mat4, Vec2, Vec3, Vec4};
 use utils::{ID, IDType, EntityIDType, IDManager};
 
 pub type Index = u32;
@@ -315,15 +315,15 @@ impl Transforms {
     }
 
     pub fn backwards2(&self, vec2: Vec2, entity: &Entity) -> Vec2 {
-        println!("{}", self.get_model_matrix(entity));
-        println!("{}", self.get_model_inverse(entity));
-        let v = vec2 * (self.get_perspective_inverse(entity) * self.get_view_inverse(entity) * self.get_model_inverse(entity));
-        println!("{}", v);
-        v
+        Vec2::from(self.get_perspective_inverse(entity) * self.get_view_inverse(entity) * self.get_model_inverse(entity) * vec2.to_vec4(0.0, 0.0))
     }
 
     pub fn backwards3(&self, vec3: Vec3, entity: &Entity) -> Vec3 {
-        vec3 * self.get_model_inverse(entity) * self.get_view_inverse(entity) * self.get_perspective_inverse(entity)
+        Vec3::from(self.get_perspective_inverse(entity) * self.get_view_inverse(entity) * self.get_model_inverse(entity) * vec3.to_vec4(0.0))
+    }
+
+    pub fn backwards4(&self, vec4: Vec4, entity: &Entity) -> Vec4 {
+        self.get_perspective_inverse(entity) * self.get_view_inverse(entity) * self.get_model_inverse(entity) * vec4
     }
 
     pub fn get_perspective_matrix(&self, entity: &Entity) -> Mat4 {

@@ -2,7 +2,7 @@ use glium::uniforms::{AsUniformValue, UniformValue};
 use std::ops::{Index, IndexMut, Add, Sub, Mul};
 use std::fmt::{Display, Formatter, Error};
 
-use math::{Mat4, Vec4};
+use math::{Vec4};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Vec3 {
@@ -84,22 +84,6 @@ impl Sub<Vec3> for Vec3 {
 
 	fn sub(self, other: Vec3) -> Vec3 {
 		Vec3::from([self[0] - other[0], self[1] - other[1], self[2] - other[2]])
-	}
-}
-
-impl Mul<Mat4> for Vec3 {
-	type Output = Vec3;
-
-	fn mul(self, other: Mat4) -> Vec3 {
-		let mut new = Vec3::zero();
-		for y in 0..3 {
-			let mut sum = 0.0;
-			for x in 0..3 {
-				sum = self[y] * other[x][y];
-			}
-			new[y] = sum;
-		}
-		new
 	}
 }
 
