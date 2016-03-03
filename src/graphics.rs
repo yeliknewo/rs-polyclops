@@ -110,6 +110,10 @@ impl Window {
         self.resolution
     }
 
+    pub fn get_resolution_vec2(&self) -> Vec2 {
+        Vec2::from([self.resolution.0 as f32, self.resolution.1 as f32])
+    }
+
     pub fn frame(&mut self) -> Frame {
         Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters)
     }

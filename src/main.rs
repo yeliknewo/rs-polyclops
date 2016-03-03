@@ -3,9 +3,13 @@ extern crate polyclops;
 use std::sync::{Arc, RwLock};
 use polyclops::{Transforms, UNSET, World, Vec2Event, Vec3Event, Vec2, WorldEvent, EntityEvent, EntityIDType, Window, WindowArgs, Game, Entity, IDManager, Being, BeingType, ID, Vertex, Vec3, Mat4, IDType, DrawMethod, DepthTestMethod, CullingMethod};
 
+mod cubes;
+
 pub static RAW_TEXTURE: &'static [u8] = include_bytes!("..\\assets\\texture.png");
 
 fn main() {
+    cubes::main();
+
     let mut manager = polyclops::init();
 
     let mut window = Window::new(WindowArgs::Borderless("Polyclops".to_string()));
@@ -30,7 +34,7 @@ pub enum MyBeingType {
 }
 
 impl BeingType<MyBeingType> for MyBeingType {
-    fn make_being(manager: &mut IDManager, being_type: MyBeingType, events: &mut Vec<WorldEvent<MyBeingType>>, window: &mut Window, game: &mut Game<MyBeingType>, world: Arc<RwLock<World<MyBeingType>>>){
+    fn make_being(manager: &mut IDManager, being_type: MyBeingType, events: &mut Vec<WorldEvent<MyBeingType>>, window: &mut Window, game: &mut Game<MyBeingType>, world: Arc<RwLock<World<MyBeingType>>>) {
         let mut new_events = events.to_vec();
         match being_type {
             MyBeingType::Mouse => {
@@ -50,7 +54,6 @@ impl BeingType<MyBeingType> for MyBeingType {
                     ))));
                     let mat4 = Mat4::identity();
                     new_events.push(WorldEvent::Entity(being.get_id(), EntityEvent::Model(mat4, mat4.to_inverse())));
-                    new_events.push(WorldEvent::Pos3(being.get_id(), Vec3Event::Add(Vec3::from([0.0, 0.0, -1.0]))));
                 }
                 world.write().expect("Unable to Write World in MyBeingType Make Being").add_being(being);
             },
@@ -64,11 +67,14 @@ impl BeingType<MyBeingType> for MyBeingType {
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::Indices(vec!(0, 1, 2, 2, 1, 0))));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::Texture(RAW_TEXTURE)));
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::DrawMethod(DrawMethod::Both(DepthTestMethod::IfLess, CullingMethod::Clockwise))));
-                let mat4 = Mat4::perspective(0.1, 100.0, 90.0, world.read().expect("Unable to Read World in MyBeingType Make Being").get_aspect_ratio());
+                //let mat4 = Mat4::perspective(0.1, 10.0, 75.0, world.read().expect("Unable to Read World in MyBeingType Make Being").get_aspect_ratio());
+                //let mat4 = Mat4::orthographic(0.1, 10.0, 75.0, world.read().expect("Unable to Read World in MyBeingType Make Being").get_aspect_ratio());
+                let mat4 = Mat4::identity();
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::Perspective(mat4, mat4.to_inverse())));
                 let mat4 = Mat4::view(0.0, 0.0, Vec3::from([0.0, 0.0, 0.0]));
+                //let mat4 = Mat4::identity();
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::View(mat4, mat4.to_inverse())));
-                let mat4 = Mat4::identity();
+                //let mat4 = Mat4::identity();
                 new_events.push(WorldEvent::EntityBase(being.get_type(), EntityEvent::Model(mat4, mat4.to_inverse())));
                 world.write().expect("Unable to Write World in MyBeingType Make Being").set_base_being(being);
             },
@@ -124,7 +130,7 @@ impl Being<MyBeingType> for BeingMouse {
         } else {
             let mat4 = Mat4::translation_from_vec3(self.get_pos3());
             let mut vec = vec!(WorldEvent::Entity(self.get_id(), EntityEvent::Model(mat4, mat4.to_inverse())));
-            vec.push(WorldEvent::Pos2(self.get_id(), Vec2Event::Set(Vec2::from(transforms.backwards3(Vec3::from([world.get_mouse_pos_world()[0], world.get_mouse_pos_world()[1], self.get_pos3()[2]]), &self.entity)))));
+            vec.push(WorldEvent::Pos2(self.get_id(), Vec2Event::Set(transforms.backwards2(world.get_mouse_pos_world(), &self.entity))));
             vec
         }
     }

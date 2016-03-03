@@ -1,5 +1,6 @@
 use std::ops::{Index, IndexMut, Mul};
 use std::fmt::{Display, Formatter, Error};
+use std::f32::consts::{PI};
 use glium::uniforms::{AsUniformValue, UniformValue};
 
 use math::{Vec3, Vec4};
@@ -23,6 +24,7 @@ impl Mat4 {
 	}
 
 	pub fn perspective(near: f32, far: f32, field_of_view: f32, aspect_ratio: f32) -> Mat4 {
+		let field_of_view = field_of_view * PI / 180.0;
 		let d = 1.0 / ((field_of_view / 2.0).tan());
 		Mat4::from([[
 					d / aspect_ratio, 	0.0, 	0.0, 							0.0,
@@ -38,21 +40,24 @@ impl Mat4 {
 	}
 
 	pub fn orthographic(near: f32, far: f32, field_of_view: f32, aspect_ratio: f32) -> Mat4 {
+		let field_of_view = field_of_view * PI / 180.0;
 		let d = 1.0 / ((field_of_view / 2.0).tan());
 		Mat4::from([[
-					d / aspect_ratio, 0.0, 0.0, 0.0,
+					d / aspect_ratio, 	0.0, 	0.0, 					0.0,
 				],[
-					0.0, d, 0.0, 0.0,
+					0.0, 				d, 		0.0, 					0.0,
 				],[
-					0.0, 0.0, -2.0 / (far - near), -(far + near) / (far - near),
+					0.0, 				0.0, 	-2.0 / (far - near), 	-(far + near) / (far - near),
 				],[
-					0.0, 0.0, 0.0, 1.0,
+					0.0, 				0.0, 	0.0, 					1.0,
 				]
 			]
 		)
 	}
 
 	pub fn view(pitch: f32, yaw: f32, camera_position: Vec3) -> Mat4{
+		let pitch = pitch * PI / 180.0;
+		let yaw = yaw * PI / 180.0;
 		let pitch_cos = pitch.cos();
 		let pitch_sin = pitch.sin();
 
@@ -64,13 +69,13 @@ impl Mat4 {
 		let z = Vec3::from([yaw_sin * pitch_cos, -pitch_sin, pitch_cos * yaw_cos]);
 
 		Mat4::from([[
-					x[0], x[1], x[2], -x.dot(camera_position),
+					x[0], 	x[1], 	x[2], 	-x.dot(camera_position),
 				],[
-					y[0], y[1], y[2], -y.dot(camera_position),
+					y[0], 	y[1], 	y[2], 	-y.dot(camera_position),
 				],[
-					z[0], z[1], z[2], -z.dot(camera_position),
+					z[0], 	z[1], 	z[2], 	-z.dot(camera_position),
 				],[
-					0.0, 0.0, 0.0, 1.0,
+					0.0, 	0.0, 	0.0, 	1.0,
 				]
 			]
 		)
@@ -78,13 +83,13 @@ impl Mat4 {
 
 	pub fn scalation_from_vec3(vec3: Vec3) -> Mat4 {
 		Mat4::from([[
-					vec3[0], 0.0, 0.0, 0.0,
+					vec3[0], 	0.0, 		0.0, 		0.0,
 				],[
-					0.0, vec3[1], 0.0, 0.0,
+					0.0, 		vec3[1],	0.0, 		0.0,
 				],[
-					0.0, 0.0, vec3[2], 0.0,
+					0.0, 		0.0, 		vec3[2], 	0.0,
 				],[
-					0.0, 0.0, 0.0, 1.0,
+					0.0, 		0.0, 		0.0, 		1.0,
 				]
 			]
 		)
