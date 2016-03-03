@@ -9,6 +9,7 @@ use game::{Game};
 
 pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Hash {
     fn make_being(&mut IDManager, T, &mut Vec<WorldEvent<T>>, &mut Window, &mut Game<T>, Arc<RwLock<World<T>>>);
+    fn make_base(&mut IDManager, T, &mut Window, Arc<RwLock<Transforms>>, Arc<RwLock<World<T>>>);
 }
 
 pub trait Being<T: BeingType<T>>: Send + Sync {

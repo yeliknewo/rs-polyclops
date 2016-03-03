@@ -5,14 +5,14 @@ use glium::glutin::MouseButton as GliumMouseButton;
 use glium::glutin::VirtualKeyCode as GliumKeyCode;
 
 use utils::{ID, EntityIDType};
-use graphics::{Vertex, Index, DrawMethod};
+use graphics::{Vertex, Index, DrawMethod, Entity};
 use math::{Vec2, Vec3, Mat4};
 use being::{Being, BeingType};
 use keyboard::{Keyboard};
 
 pub struct World<T: BeingType<T>> {
     beings: HashMap<ID, Arc<RwLock<Box<Being<T>>>>>,
-    base_beings: HashMap<T, Arc<RwLock<Box<Being<T>>>>>,
+    bases: HashMap<T, Arc<RwLock<Entity>>>,
     mouse_pos: Vec2,
     mouse_pos_world: Vec2,
     resolution: Vec2,
@@ -25,7 +25,7 @@ impl<T: BeingType<T>> World<T> {
     pub fn new(resolution: Vec2) -> World<T> {
         World {
             beings: HashMap::new(),
-            base_beings: HashMap::new(),
+            bases: HashMap::new(),
             mouse_pos: Vec2::zero(),
             mouse_pos_world: Vec2::zero(),
             resolution: resolution,
@@ -51,12 +51,12 @@ impl<T: BeingType<T>> World<T> {
         self.beings.get(&id)
     }
 
-    pub fn set_base_being(&mut self, being: Box<Being<T>>) {
-        self.base_beings.insert(being.get_type(), Arc::new(RwLock::new(being)));
+    pub fn set_base(&mut self, being_type: T, entity: Entity) {
+        self.bases.insert(being_type, Arc::new(RwLock::new(entity)));
     }
 
-    pub fn get_base_being(&self, being_type: T) -> Option<&Arc<RwLock<Box<Being<T>>>>> {
-        self.base_beings.get(&being_type)
+    pub fn get_base(&self, being_type: T) -> Option<&Arc<RwLock<Entity>>> {
+        self.bases.get(&being_type)
     }
 
     pub fn update_keyboard(&mut self, key: GliumKeyCode, state: GliumElementState) {
@@ -112,8 +112,8 @@ impl<T: BeingType<T>> World<T> {
 
 pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
     match event {
+        WorldEvent::NewBase(_) => 200,
         WorldEvent::NewBeing(_, _) => 100,
-        WorldEvent::NewBeingBase(_, _) => 200,
         WorldEvent::EndBeing(_) => 0,
         WorldEvent::Pos2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 5,
@@ -175,7 +175,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
 #[derive(Clone)]
 pub enum WorldEvent<T: BeingType<T>> {
     NewBeing(T, Vec<WorldEvent<T>>),
-    NewBeingBase(T, Vec<WorldEvent<T>>),
+    NewBase(T),
     EndBeing(ID),
     Pos2(ID, Vec2Event),
     Pos3(ID, Vec3Event),

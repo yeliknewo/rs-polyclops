@@ -14,7 +14,7 @@ mod game;
 mod being;
 mod keyboard;
 
-pub use self::graphics::{Transforms, Window, WindowArgs, Entity, Vertex, Index, DrawMethod, DepthTestMethod, CullingMethod};
+pub use self::graphics::{method_to_parameters, Transforms, Window, WindowArgs, Entity, Vertex, Index, DrawMethod, DepthTestMethod, CullingMethod};
 pub use self::utils::{UNSET, ID, IDManager, IDType, EntityIDType};
 pub use self::math::{Mat4, Vec2, Vec3, Vec4};
 pub use self::being::{Being, BeingType};
