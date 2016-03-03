@@ -74,8 +74,7 @@ impl<T: BeingType<T>> World<T> {
 
     pub fn update_mouse_pos(&mut self, mouse_pos: Vec2) {
         self.mouse_pos = mouse_pos;
-        let x = 2.0 / self.resolution[0];
-        self.mouse_pos_world = (self.mouse_pos.clone() + self.resolution * (-1.0 / 2.0)) * Vec2::from([x, -x * self.aspect_ratio]);
+        self.mouse_pos_world = self.screen_to_world_point(mouse_pos);
     }
 
     pub fn get_key(&self, key: GliumKeyCode) -> GliumElementState {
@@ -103,6 +102,11 @@ impl<T: BeingType<T>> World<T> {
 
     pub fn get_mouse_pos_world(&self) -> Vec2 {
         self.mouse_pos_world
+    }
+
+    pub fn screen_to_world_point(&self, vec2: Vec2) -> Vec2 {
+        let x = 2.0 / self.resolution[0];
+        (vec2 + self.resolution * (-1.0 / 2.0)) * Vec2::from([x, -x * self.aspect_ratio])
     }
 }
 

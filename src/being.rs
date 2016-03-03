@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::hash::{Hash};
 
 use utils::{ID, IDManager};
-use graphics::{Entity, Window};
+use graphics::{Entity, Window, Transforms};
 use world::{World, WorldEvent};
 use math::{Vec2, Vec3};
 use game::{Game};
@@ -15,7 +15,7 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
     fn get_type(&self) -> T;
     fn get_id(&self) -> ID;
     fn get_entity(&self) -> &Entity;
-    fn tick(&self, &World<T>, &f32) -> Vec<WorldEvent<T>>;
+    fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<WorldEvent<T>>;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())
     }

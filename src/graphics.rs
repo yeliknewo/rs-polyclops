@@ -6,6 +6,7 @@ use glium::{Surface, DisplayBuild, Program, VertexBuffer, IndexBuffer, DrawParam
 use glium;
 use image::{load_from_memory};
 use std::collections::{HashMap};
+use std::sync::{Arc, RwLock};
 
 use math::{Mat4, Vec2, Vec3};
 use utils::{ID, IDType, EntityIDType, IDManager};
@@ -19,12 +20,6 @@ pub struct Window {
     vertex_buffers: HashMap<ID, VertexBuffer<Vertex>>,
     index_buffers: HashMap<ID, IndexBuffer<Index>>,
     draw_parameters: HashMap<ID, DrawParameters<'static>>,
-    perspective_mat4s: HashMap<ID, Mat4>,
-    perspective_inverse: HashMap<ID, Mat4>,
-    view_mat4s: HashMap<ID, Mat4>,
-    view_inverse: HashMap<ID, Mat4>,
-    model_mat4s: HashMap<ID, Mat4>,
-    model_inverse: HashMap<ID, Mat4>,
     resolution: (u32, u32),
 }
 
@@ -83,12 +78,6 @@ impl Window {
                     vertex_buffers: HashMap::new(),
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
-                    perspective_mat4s: HashMap::new(),
-                    perspective_inverse: HashMap::new(),
-                    view_mat4s: HashMap::new(),
-                    view_inverse: HashMap::new(),
-                    model_mat4s: HashMap::new(),
-                    model_inverse: HashMap::new(),
                     resolution: resolution,
                 }
             },
@@ -111,12 +100,6 @@ impl Window {
                     vertex_buffers: HashMap::new(),
                     index_buffers: HashMap::new(),
                     draw_parameters: HashMap::new(),
-                    perspective_mat4s: HashMap::new(),
-                    perspective_inverse: HashMap::new(),
-                    view_mat4s: HashMap::new(),
-                    view_inverse: HashMap::new(),
-                    model_mat4s: HashMap::new(),
-                    model_inverse: HashMap::new(),
                     resolution: resolution,
                 }
             },
@@ -128,7 +111,7 @@ impl Window {
     }
 
     pub fn frame(&mut self) -> Frame {
-        Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters, &mut self.perspective_mat4s, &mut self.view_mat4s, &mut self.model_mat4s)
+        Frame::new(&mut self.facade, &mut self.program, &mut self.texture_buffers, &mut self.vertex_buffers, &mut self.index_buffers, &mut self.draw_parameters)
     }
 
     pub fn poll_events(&self) -> PollEventsIter {
@@ -146,18 +129,6 @@ impl Window {
 
     pub fn set_indices(&mut self, entity: &Entity, indices: Vec<Index>) {
         self.index_buffers.insert(entity.index_id, IndexBuffer::new(&self.facade, glium::index::PrimitiveType::TrianglesList, &indices).expect("Failed to Create Index Buffer"));
-    }
-
-    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective_matrix: Mat4, perspective_matrix_inverse: Mat4) {
-        self.perspective_mat4s.insert(entity.perspective_id, perspective_matrix);
-    }
-
-    pub fn set_view_matrix(&mut self, entity: &Entity, view_matrix: Mat4, view_matrix_inverse: Mat4) {
-        self.view_mat4s.insert(entity.view_id, view_matrix);
-    }
-
-    pub fn set_model_matrix(&mut self, entity: &Entity, model_matrix: Mat4, model_matrix_inverse: Mat4) {
-        self.model_mat4s.insert(entity.model_id, model_matrix);
     }
 
     pub fn set_default_draw_parameters(&mut self, entity: &Entity) {
@@ -278,9 +249,6 @@ pub struct Frame<'a> {
     vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>,
     index_buffers: &'a mut HashMap<ID, IndexBuffer<Index>>,
     draw_parameters: &'a mut HashMap<ID, DrawParameters<'static>>,
-    perspective_mat4s: &'a mut HashMap<ID, Mat4>,
-    view_mat4s: &'a mut HashMap<ID, Mat4>,
-    model_mat4s: &'a mut HashMap<ID, Mat4>,
     frame: glium::Frame,
 }
 
@@ -292,9 +260,6 @@ impl<'a> Frame<'a> {
         vertex_buffers: &'a mut HashMap<ID, VertexBuffer<Vertex>>,
         index_buffers: &'a mut HashMap<ID, IndexBuffer<Index>>,
         draw_parameters: &'a mut HashMap<ID, DrawParameters<'static>>,
-        perspective_mat4s: &'a mut HashMap<ID, Mat4>,
-        view_mat4s: &'a mut HashMap<ID, Mat4>,
-        model_mat4s: &'a mut HashMap<ID, Mat4>,
     ) -> Frame<'a> {
         let mut frame = facade.draw();
         frame.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
@@ -305,22 +270,19 @@ impl<'a> Frame<'a> {
             vertex_buffers: vertex_buffers,
             index_buffers: index_buffers,
             draw_parameters: draw_parameters,
-            perspective_mat4s: perspective_mat4s,
-            view_mat4s: view_mat4s,
-            model_mat4s: model_mat4s,
         }
     }
 
-    pub fn draw_entity(&mut self, entity: &Entity) {
+    pub fn draw_entity(&mut self, entity: &Entity,transforms: &Arc<RwLock<Transforms>>) {
         self.frame.draw(
             &self.vertex_buffers[&entity.vertex_id],
             &self.index_buffers[&entity.index_id],
             &self.program,
             &uniform!(
                 tex: &self.texture_buffers[&entity.texture_id],
-                perspective: self.perspective_mat4s[&entity.perspective_id],
-                view: self.view_mat4s[&entity.view_id],
-                model: self.model_mat4s[&entity.model_id],
+                perspective: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_perspective_mat4s()[&entity.perspective_id],
+                view: transforms.read().expect("Unable to Read Transforms in Draw Entity In Frame").get_view_mat4s()[&entity.view_id],
+                model: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_model_mat4s()[&entity.model_id],
             ),
             &self.draw_parameters[&entity.draw_parameters_id])
             .expect("Unable to draw Entity");
@@ -328,6 +290,91 @@ impl<'a> Frame<'a> {
 
     pub fn end(self) {
         self.frame.finish().expect("Unable to Finish Frame");
+    }
+}
+
+pub struct Transforms {
+    perspective_mat4s: HashMap<ID, Mat4>,
+    perspective_mat4s_inverse: HashMap<ID, Mat4>,
+    view_mat4s: HashMap<ID, Mat4>,
+    view_mat4s_inverse: HashMap<ID, Mat4>,
+    model_mat4s: HashMap<ID, Mat4>,
+    model_mat4s_inverse: HashMap<ID, Mat4>,
+}
+
+impl Transforms {
+    pub fn new() -> Transforms {
+        Transforms {
+            perspective_mat4s: HashMap::new(),
+            perspective_mat4s_inverse: HashMap::new(),
+            view_mat4s: HashMap::new(),
+            view_mat4s_inverse: HashMap::new(),
+            model_mat4s: HashMap::new(),
+            model_mat4s_inverse: HashMap::new(),
+        }
+    }
+
+    pub fn backwards2(&self, vec2: Vec2, entity: &Entity) -> Vec2 {
+        println!("{}", self.get_model_matrix(entity));
+        println!("{}", self.get_model_inverse(entity));
+        let v = vec2 * (self.get_perspective_inverse(entity) * self.get_view_inverse(entity) * self.get_model_inverse(entity));
+        println!("{}", v);
+        v
+    }
+
+    pub fn backwards3(&self, vec3: Vec3, entity: &Entity) -> Vec3 {
+        vec3 * self.get_model_inverse(entity) * self.get_view_inverse(entity) * self.get_perspective_inverse(entity)
+    }
+
+    pub fn get_perspective_matrix(&self, entity: &Entity) -> Mat4 {
+        self.perspective_mat4s[&entity.perspective_id]
+    }
+
+    pub fn get_perspective_inverse(&self, entity: &Entity) -> Mat4 {
+        self.perspective_mat4s_inverse[&entity.perspective_id]
+    }
+
+    pub fn get_perspective_mat4s(&self) -> &HashMap<ID, Mat4> {
+        &self.perspective_mat4s
+    }
+
+    pub fn set_perspective_matrix(&mut self, entity: &Entity, perspective: Mat4, inverse: Mat4) {
+        self.perspective_mat4s.insert(entity.perspective_id, perspective);
+        self.perspective_mat4s_inverse.insert(entity.perspective_id, inverse);
+    }
+
+    pub fn get_view_matrix(&self, entity: &Entity) -> Mat4 {
+        self.view_mat4s[&entity.view_id]
+    }
+
+    pub fn get_view_inverse(&self, entity: &Entity) -> Mat4 {
+        self.view_mat4s_inverse[&entity.view_id]
+    }
+
+    pub fn get_view_mat4s(&self) -> &HashMap<ID, Mat4> {
+        &self.view_mat4s
+    }
+
+    pub fn set_view_matrix(&mut self, entity: &Entity, view: Mat4, inverse: Mat4) {
+        self.view_mat4s.insert(entity.view_id, view);
+        self.view_mat4s_inverse.insert(entity.view_id, inverse);
+    }
+
+    pub fn get_model_matrix(&self, entity: &Entity) -> Mat4 {
+        self.model_mat4s[&entity.model_id]
+    }
+
+    pub fn get_model_inverse(&self, entity: &Entity) -> Mat4 {
+        self.model_mat4s_inverse[&entity.model_id]
+    }
+
+    pub fn get_model_mat4s(&self) -> &HashMap<ID, Mat4> {
+        &self.model_mat4s
+    }
+
+    pub fn set_model_matrix(&mut self, entity: &Entity, model: Mat4, inverse: Mat4) {
+        self.model_mat4s.insert(entity.model_id, model);
+        self.model_mat4s_inverse.insert(entity.model_id, inverse);
     }
 }
 
