@@ -7,7 +7,6 @@ mod cbt {
     #[derive(Clone, Hash, Eq, PartialEq)]
     pub enum CubeBeingType {
         Cube,
-        CubeFace,
     }
 }
 

@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap};
-use polyclops::{IDManager, WorldEvent, Game, World, Entity, Vec3, ID, IDType, Being, Transforms, EntityEvent, EntityIDType, Mat4, Window, DrawMethod, method_to_parameters, DepthTestMethod, CullingMethod};
+use polyclops::{UNSET, IDManager, WorldEvent, Game, World, Entity, Vec3, ID, IDType, Being, Transforms, EntityEvent, EntityIDType, Mat4, Window, DrawMethod, method_to_parameters, DepthTestMethod, CullingMethod};
 use cubes::cbt::CubeBeingType as CBT;
 
 static CUBE_TEXTURE: &'static [u8] = include_bytes!("..\\..\\assets\\texture.png");
@@ -29,21 +29,13 @@ pub fn make_cube(manager: &mut IDManager, events: &mut Vec<WorldEvent<CBT>>, wor
     let being: Box<Being<CBT>> = Box::new(BeingCube::new_from_base(manager, world.read().unwrap().get_base(CBT::Cube).unwrap()));
     let mut events = events.to_vec();
     events = Game::fix_unset(events, &being);
-    events.push(WorldEvent::Entity(being.get_id(), EntityEvent::UseBaseID(CBT::Cube, vec!(
-        EntityIDType::Vertex,
-        EntityIDType::Index,
-        EntityIDType::Texture,
-        EntityIDType::DrawParameter,
-        EntityIDType::Perspective,
-        EntityIDType::View,
-    ))));
     let mat4 = Mat4::identity();
-    events.push(WorldEvent::Entity(being.get_id(), EntityEvent::Model(mat4, mat4.to_inverse())));
+    events.push(WorldEvent::Entity(being.get_id(), UNSET, EntityEvent::Model(mat4, mat4.to_inverse())));
     (being, events)
 }
 
 struct BeingCube {
-    entity: Vec<Entity>,
+    entities: HashMap<ID, Arc<RwLock<Entity>>>,
     pos: Vec3,
     vel: Vec3,
     acc: Vec3,
@@ -53,7 +45,7 @@ struct BeingCube {
 impl BeingCube {
     fn new_from_base(manager: &mut IDManager, base: &Arc<RwLock<Entity>>) -> BeingCube {
         BeingCube {
-            entity: vec!(),
+            entities: HashMap::new(),
             pos: Vec3::zero(),
             vel: Vec3::zero(),
             acc: Vec3::zero(),
