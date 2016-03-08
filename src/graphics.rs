@@ -58,7 +58,7 @@ impl Window {
 
         let resolution: (u32, u32) = get_primary_monitor().get_dimensions();
 
-        match args {
+        let facade = match args {
             WindowArgs::Windowed(width, height, title) => {
                 let facade = WindowBuilder::new()
                     .with_title(title)
@@ -71,15 +71,7 @@ impl Window {
                 facade.get_window()
                     .expect("Unable to find the Window")
                     .set_position(((resolution.0 - width) / 2) as i32, ((resolution.1 - height) / 2) as i32);
-                Window {
-                    program: Program::from_source(&facade, vertex_shader_src, fragment_shader_src, None).expect("Unable to make Shader Program"),
-                    facade: facade,
-                    texture_buffers: HashMap::new(),
-                    vertex_buffers: HashMap::new(),
-                    index_buffers: HashMap::new(),
-                    draw_parameters: HashMap::new(),
-                    resolution: resolution,
-                }
+                facade
             },
             WindowArgs::Borderless(title) => {
                 let facade = WindowBuilder::new()
@@ -93,21 +85,18 @@ impl Window {
                 facade.get_window()
                     .expect("Unable to find Window")
                     .set_position(0, 0);
-                Window {
-                    program: Program::from_source(&facade, vertex_shader_src, fragment_shader_src, None).expect("Unable to make Shader Program"),
-                    facade: facade,
-                    texture_buffers: HashMap::new(),
-                    vertex_buffers: HashMap::new(),
-                    index_buffers: HashMap::new(),
-                    draw_parameters: HashMap::new(),
-                    resolution: resolution,
-                }
+                facade
             },
+        };
+        Window {
+            program: Program::from_source(&facade, vertex_shader_src, fragment_shader_src, None).expect("Unable to make Shader Program"),
+            facade: facade,
+            texture_buffers: HashMap::new(),
+            vertex_buffers: HashMap::new(),
+            index_buffers: HashMap::new(),
+            draw_parameters: HashMap::new(),
+            resolution: resolution,
         }
-    }
-
-    pub fn get_start_resolution(&self) -> (u32, u32) {
-        self.resolution
     }
 
     pub fn get_resolution_vec2(&self) -> Vec2 {

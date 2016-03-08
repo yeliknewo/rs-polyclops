@@ -1,9 +1,11 @@
 extern crate polyclops;
 
-mod cubes;
+//mod cubes;
+mod iso;
 
 fn main() {
-    cubes::main();
+    //cubes::main();
+    iso::main();
 }
 
 // #[derive(Clone, Eq, Hash, PartialEq)]
