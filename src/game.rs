@@ -8,7 +8,7 @@ use scoped_threadpool::{Pool};
 use time::{precise_time_s};
 
 use utils::{ID, IDManager, IDType};
-use world::{World, WorldEvent, EntityEvent, TickAfterEvent, TransformEvent, Vec2Event, Vec3Event, get_rank};
+use world::{World, WorldEvent, TickEvent, TickAfterEvent, EntityEvent, TransformEvent, Vec2Event, Vec3Event, get_rank};
 use graphics::{Window, Transforms, method_to_parameters};
 use being::{BeingType, Being};
 use math::{Vec2};
@@ -25,7 +25,8 @@ pub struct Game<T: BeingType<T>> {
     mouse_buttons: HashMap<GliumMouseButton, GliumElementState>,
     transforms: Arc<RwLock<Transforms>>,
     manager: Arc<RwLock<IDManager>>,
-    ranked_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<WorldEvent<T>>>>>>>,
+    ranked_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<TickEvent<T>>>>>>>,
+    ranked_tick_after_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<TickAfterEvent<T>>>>>>>,
     ranks: Arc<RwLock<Vec<u32>>>,
 }
 
@@ -48,6 +49,7 @@ impl<T: BeingType<T>> Game<T> {
             transforms: Arc::new(RwLock::new(Transforms::new())),
             manager: manager,
             ranked_events: Arc::new(RwLock::new(HashMap::new())),
+            ranked_tick_after_events: Arc::new(RwLock::new(HashMap::new())),
             ranks: Arc::new(RwLock::new(vec!()))
         }
     }
@@ -85,8 +87,8 @@ impl<T: BeingType<T>> Game<T> {
         self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Update Resolution").write().expect("Unable to Write Active World in Update Resolution").update_resolution(self.resolution, self.aspect_ratio);
     }
 
-    pub fn run(&mut self, starting_events: Vec<WorldEvent<T>>, starting_tick_after_events: Vec<TickAfterEvent<T>>, window: &mut Window) {
-        self.starting_events(window, 0.0, Arc::new(RwLock::new(starting_events)), starting_tick_after_events);
+    pub fn run(&mut self, starting_events: Vec<WorldEvent<T>>, window: &mut Window) {
+        self.starting_events(window, 0.0, Arc::new(RwLock::new(starting_events)));
 
         let tps: f64 = 60.0;
         let tps_s: f64 = 1.0 / tps;
@@ -182,8 +184,8 @@ impl<T: BeingType<T>> Game<T> {
         frame.end();
     }
 
-    fn tick(&mut self, delta_time: f32) -> Vec<WorldEvent<T>> {
-        let events_arc: Arc<RwLock<Vec<WorldEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+    fn tick(&mut self, delta_time: f32) -> Vec<TickEvent<T>> {
+        let events_arc: Arc<RwLock<Vec<TickEvent<T>>>> = Arc::new(RwLock::new(vec!()));
         let delta_time_arc = Arc::new(delta_time);
         let active_world = self.worlds.remove(&self.active_world_id).expect("Unable to find Active world in Tick");
         {
@@ -214,27 +216,34 @@ impl<T: BeingType<T>> Game<T> {
         events.into_inner().expect("Unable to Dereference Events in Tick")
     }
 
-    fn tick_after(&mut self) -> Vec<TickAfterEvent<T>> {
-        vec!()
+    fn tick_after(&mut self) -> Arc<RwLock<Vec<TickAfterEvent<T>>>> {
+        Arc::new(RwLock::new(vec!()))
     }
 
-    fn execute_tick_after_events(&mut self, events: Vec<TickAfterEvent<T>>) {
+    fn execute_tick_after_events(&mut self, events: Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
 
     }
 
-    pub fn starting_events(&mut self, window: &mut Window, delta_time: f32, events: Arc<RwLock<Vec<WorldEvent<T>>>>, ticks_after_events: Vec<TickAfterEvent<T>>) {
-        self.expand_events(events);
+    fn starting_events(&mut self, window: &mut Window, delta_time: f32, events: Arc<RwLock<Vec<WorldEvent<T>>>>) {
+        let events_split = self.split_events(events);
+        self.expand_events(events_split.0);
         self.execute_events(delta_time);
         self.clear_executions();
-        self.execute_tick_after_events(ticks_after_events);
+        self.execute_tick_after_events(events_split.1);
     }
 
-    pub fn clear_executions(&mut self) {
+    fn split_events(&self, events: Arc<RwLock<Vec<WorldEvent<T>>>>) -> (Arc<RwLock<Vec<TickEvent<T>>>>, Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
+        let tick: Arc<RwLock<Vec<TickEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+        let after: Arc<RwLock<Vec<TickAfterEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+        (tick, after)
+    }
+
+    fn clear_executions(&mut self) {
         self.ranked_events.write().expect("Unable to Write Ranked Events in Clear Executions").clear();
         self.ranks.write().expect("Unable to Write Ranks in Clear Executions").clear();
     }
 
-    fn expand_events(&mut self, events: Arc<RwLock<Vec<WorldEvent<T>>>>) {
+    fn expand_events(&mut self, events: Arc<RwLock<Vec<TickEvent<T>>>>) {
         let mut events = events.write().unwrap();
         loop {
             match events.pop() {
@@ -282,18 +291,18 @@ impl<T: BeingType<T>> Game<T> {
                             let event_option  = events_vec.write().expect("Unable to Write Events Vec in Execute Events").pop();
                             let events_new_option = match event_option {
                                 Some(event) => match event {
-                                    WorldEvent::NewBeing(being_type) => {
+                                    TickEvent::NewBeing(being_type) => {
                                         Some(T::make_being(manager, being_type, active_world))
                                     },
-                                    WorldEvent::NewBase(being_type) => {
+                                    TickEvent::NewBase(being_type) => {
                                         Some(T::make_base(manager, being_type, active_world))
                                     },
-                                    WorldEvent::EndBeing(id) => {
+                                    TickEvent::EndBeing(id) => {
                                         let mut world = active_world.write().expect("Unable to Write Active World in Execute Events");
                                         world.del_being(id);
                                         None
                                     },
-                                    WorldEvent::Pos2(id, vec2_event) => {
+                                    TickEvent::Pos2(id, vec2_event) => {
                                         match vec2_event {
                                             Vec2Event::Set(vec2) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -313,7 +322,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Pos3(id, vec3_event) => {
+                                    TickEvent::Pos3(id, vec3_event) => {
                                         match vec3_event {
                                             Vec3Event::Set(vec3) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -333,7 +342,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Vel2(id, vec2_event) => {
+                                    TickEvent::Vel2(id, vec2_event) => {
                                         match vec2_event {
                                             Vec2Event::Set(vec2) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -353,7 +362,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Vel3(id, vec3_event) => {
+                                    TickEvent::Vel3(id, vec3_event) => {
                                         match vec3_event {
                                             Vec3Event::Set(vec3) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -373,7 +382,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Acc2(id, vec2_event) => {
+                                    TickEvent::Acc2(id, vec2_event) => {
                                         match vec2_event {
                                             Vec2Event::Set(vec2) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -393,7 +402,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Acc3(id, vec3_event) => {
+                                    TickEvent::Acc3(id, vec3_event) => {
                                         match vec3_event {
                                             Vec3Event::Set(vec3) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -413,7 +422,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::Transform(being_id, entity_id, transform_event) => {
+                                    TickEvent::Transform(being_id, entity_id, transform_event) => {
                                         match transform_event {
                                             TransformEvent::Perspective(matrix, inverse) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
@@ -436,7 +445,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    WorldEvent::TransformBase(being_type, entity_id, transform_event) => {
+                                    TickEvent::TransformBase(being_type, entity_id, transform_event) => {
                                         match transform_event {
                                             TransformEvent::Perspective(perspective, inverse) => {
                                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Perspective in Execute Events");
@@ -456,7 +465,7 @@ impl<T: BeingType<T>> Game<T> {
                                         };
                                         None
                                     },
-                                    /*WorldEvent::Entity(being_id, entity_id, entity_event) => match entity_event {
+                                    /*TickEvent::Entity(being_id, entity_id, entity_event) => match entity_event {
                                         EntityEvent::Vertices(vertices) => {
                                             let world = active_world.read().expect("Unable to Read Active World in Execute Events");
                                             let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
@@ -528,7 +537,7 @@ impl<T: BeingType<T>> Game<T> {
                                             }
                                         }
                                     },
-                                    WorldEvent::EntityBase(being_type, entity_id, entity_base_event) => match entity_base_event {
+                                    TickEvent::EntityBase(being_type, entity_id, entity_base_event) => match entity_base_event {
                                         EntityEvent::Vertices(vertices) => {
                                             let world = active_world.read().expect("Unable to Read Active World in Entity Base Vertices Execute Events");
                                             let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Vertices in Execute Events").read().expect("Unable to Read Base in Entity Base Vertices in Execute Events");
@@ -610,8 +619,10 @@ impl<T: BeingType<T>> Game<T> {
             });
         }
         if re_execute {
-            self.expand_events(re_execute_buffer);
+            let events_split = self.split_events(re_execute_buffer);
+            self.expand_events(events_split.0);
             self.execute_events(delta_time);
+            self.ranked_tick_after_events.write().expect("Unable to Write Ranked Tick After Events").append(events_split.1);
         }
     }
 

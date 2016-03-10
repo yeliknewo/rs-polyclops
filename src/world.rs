@@ -110,42 +110,42 @@ impl<T: BeingType<T>> World<T> {
     }
 }
 
-pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
+pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
     match event {
-        WorldEvent::NewBase(_) => 200,
-        WorldEvent::NewBeing(_) => 100,
-        WorldEvent::EndBeing(_) => 0,
-        WorldEvent::Pos2(_, vec2_event) => match vec2_event {
+        TickEvent::NewBase(_) => 200,
+        TickEvent::NewBeing(_) => 100,
+        TickEvent::EndBeing(_) => 0,
+        TickEvent::Pos2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 5,
             Vec2Event::Add(_) => 6,
             Vec2Event::Mul(_) => 7,
         },
-        WorldEvent::Pos3(_, vec3_event) => match vec3_event {
+        TickEvent::Pos3(_, vec3_event) => match vec3_event {
             Vec3Event::Set(_) => 5,
             Vec3Event::Add(_) => 6,
             Vec3Event::Mul(_) => 7,
         },
-        WorldEvent::Vel2(_, vec2_event) => match vec2_event {
+        TickEvent::Vel2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 10,
             Vec2Event::Add(_) => 11,
             Vec2Event::Mul(_) => 12,
         },
-        WorldEvent::Vel3(_, vec3_event) => match vec3_event {
+        TickEvent::Vel3(_, vec3_event) => match vec3_event {
             Vec3Event::Set(_) => 10,
             Vec3Event::Add(_) => 11,
             Vec3Event::Mul(_) => 12,
         },
-        WorldEvent::Acc2(_, vec2_event) => match vec2_event {
+        TickEvent::Acc2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 15,
             Vec2Event::Add(_) => 16,
             Vec2Event::Mul(_) => 17,
         },
-        WorldEvent::Acc3(_, vec3_event) => match vec3_event {
+        TickEvent::Acc3(_, vec3_event) => match vec3_event {
             Vec3Event::Set(_) => 15,
             Vec3Event::Add(_) => 16,
             Vec3Event::Mul(_) => 17,
         },
-        // WorldEvent::Entity(_, _, entity_event) => match entity_event {
+        // TickEvent::Entity(_, _, entity_event) => match entity_event {
         //     EntityEvent::Vertices(_) => 1,
         //     EntityEvent::Indices(_) => 1,
         //     EntityEvent::Texture(_) => 1,
@@ -157,7 +157,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
         //     EntityEvent::UseOldID(_, _, _) => 3,
         //     EntityEvent::UseBaseID(_, _, _) => 2,
         // },
-        // WorldEvent::EntityBase(_, _, entity_event) => match entity_event {
+        // TickEvent::EntityBase(_, _, entity_event) => match entity_event {
         //     EntityEvent::Vertices(_) => 1,
         //     EntityEvent::Indices(_) => 1,
         //     EntityEvent::Texture(_) => 1,
@@ -169,9 +169,15 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
         //     EntityEvent::UseOldID(_, _, _) => 3,
         //     EntityEvent::UseBaseID(_, _, _) => 2,
         // },
-        WorldEvent::Transform(_, _, transform_event) => 1,
-        WorldEvent::TransformBase(_, _, transforms_event) => 1,
+        TickEvent::Transform(_, _, transform_event) => 1,
+        TickEvent::TransformBase(_, _, transforms_event) => 1,
     }
+}
+
+#[derive(Clone)]
+pub enum WorldEvent<T: BeingType<T>> {
+    TickEvent(TickEvent<T>),
+    TickAfterEvent(TickAfterEvent<T>),
 }
 
 #[derive(Clone)]
@@ -181,7 +187,7 @@ pub enum TickAfterEvent<T: BeingType<T>> {
 }
 
 #[derive(Clone)]
-pub enum WorldEvent<T: BeingType<T>> {
+pub enum TickEvent<T: BeingType<T>> {
     NewBeing(T),
     NewBase(T),
     EndBeing(ID),

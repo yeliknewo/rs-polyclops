@@ -4,7 +4,7 @@ use std::collections::{HashMap};
 
 use utils::{ID, IDManager};
 use graphics::{Entity, Window, Transforms};
-use world::{World, WorldEvent, TickAfterEvent};
+use world::{World, WorldEvent, TickEvent, TickAfterEvent};
 use math::{Vec2, Vec3};
 use game::{Game};
 
@@ -20,7 +20,7 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
         self.get_entities().get(&id)
     }
     fn get_entities(&self) -> &HashMap<ID, Arc<RwLock<Entity>>>;
-    fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<WorldEvent<T>>;
+    fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<TickEvent<T>>;
     fn tick_after(&self, &World<T>, &Transforms) -> Vec<TickAfterEvent<T>>;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())
