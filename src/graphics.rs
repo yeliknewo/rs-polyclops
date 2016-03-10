@@ -342,15 +342,15 @@ pub struct Entity {
 }
 
 impl Entity {
-    pub fn new(manager: &mut IDManager) -> Entity {
+    pub fn new(manager: Arc<RwLock<IDManager>>) -> Entity {
         Entity {
-            texture_id: ID::new(manager, IDType::Entity(EntityIDType::Texture)),
-            vertex_id: ID::new(manager, IDType::Entity(EntityIDType::Vertex)),
-            index_id: ID::new(manager, IDType::Entity(EntityIDType::Index)),
-            draw_parameters_id: ID::new(manager, IDType::Entity(EntityIDType::DrawParameter)),
-            perspective_id: ID::new(manager, IDType::Entity(EntityIDType::Perspective)),
-            view_id: ID::new(manager, IDType::Entity(EntityIDType::View)),
-            model_id: ID::new(manager, IDType::Entity(EntityIDType::Model)),
+            texture_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::Texture)),
+            vertex_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::Vertex)),
+            index_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::Index)),
+            draw_parameters_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::DrawParameter)),
+            perspective_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::Perspective)),
+            view_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::View)),
+            model_id: ID::new(manager.clone(), IDType::Entity(EntityIDType::Model)),
         }
     }
 
@@ -393,7 +393,7 @@ impl Entity {
         };
     }
 
-    pub fn use_new_id(&mut self, manager: &mut IDManager, id_type: EntityIDType) {
+    pub fn use_new_id(&mut self, manager: Arc<RwLock<IDManager>>, id_type: EntityIDType) {
         let id = ID::new(manager, IDType::Entity(id_type));
         match id_type {
             EntityIDType::Vertex => {

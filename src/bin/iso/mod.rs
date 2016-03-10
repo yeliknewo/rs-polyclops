@@ -1,7 +1,8 @@
-use polyclops::{init, Window, WindowArgs, Game, World, BeingType};
+use std::sync::{Arc, RwLock};
+use polyclops::{init, Window, WindowArgs, Game, World, BeingType, IDManager, TickEvent};
 
 pub fn main() {
-    let mut manager = init();
+    let manager = init();
 
     let mut window = Window::new(WindowArgs::Borderless("iso".to_string()));
 
@@ -9,20 +10,26 @@ pub fn main() {
 
     let thread_count = 8;
 
-    let mut game: Game<IBT> = Game::<IBT>::new(&mut manager, thread_count, World::new(resolution), resolution);
+    let mut game: Game<IBT> = Game::<IBT>::new(manager, thread_count, World::new(resolution), resolution);
+
+    game.run(vec!(), vec!(), &mut window);
 }
 
 use self::iso_being_type::IsoBeingType as IBT;
 
 mod iso_being_type {
     #[derive(Clone, Hash, Eq, PartialEq)]
-    enum IsoBeingType {
+    pub enum IsoBeingType {
         Tile,
     }
 }
 
 impl BeingType<IBT> for IBT {
-    fn make_being() {
-        
+    fn make_being(manager: Arc<RwLock<IDManager>>, being_type: IBT, world: Arc<RwLock<World<IBT>>>) -> Vec<TickEvent<IBT>> {
+        vec!()
+    }
+
+    fn make_base(manager: Arc<RwLock<IDManager>>, being_type: IBT, world: Arc<RwLock<World<IBT>>>) -> Vec<TickEvent<IBT>> {
+        vec!()
     }
 }

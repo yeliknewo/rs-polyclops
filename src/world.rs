@@ -113,7 +113,7 @@ impl<T: BeingType<T>> World<T> {
 pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
     match event {
         WorldEvent::NewBase(_) => 200,
-        WorldEvent::NewBeing(_, _) => 100,
+        WorldEvent::NewBeing(_) => 100,
         WorldEvent::EndBeing(_) => 0,
         WorldEvent::Pos2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 5,
@@ -145,36 +145,44 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             Vec3Event::Add(_) => 16,
             Vec3Event::Mul(_) => 17,
         },
-        WorldEvent::Entity(_, _, entity_event) => match entity_event {
-            EntityEvent::Vertices(_) => 1,
-            EntityEvent::Indices(_) => 1,
-            EntityEvent::Texture(_) => 1,
-            EntityEvent::DrawMethod(_) => 1,
-            EntityEvent::Perspective(_, _) => 1,
-            EntityEvent::View(_, _) => 1,
-            EntityEvent::Model(_, _) => 1,
-            EntityEvent::UseNewID(_) => 2,
-            EntityEvent::UseOldID(_, _, _) => 2,
-            EntityEvent::UseBaseID(_, _, _) => 2,
-        },
-        WorldEvent::EntityBase(_, _, entity_event) => match entity_event {
-            EntityEvent::Vertices(_) => 1,
-            EntityEvent::Indices(_) => 1,
-            EntityEvent::Texture(_) => 1,
-            EntityEvent::DrawMethod(_) => 1,
-            EntityEvent::Perspective(_, _) => 1,
-            EntityEvent::View(_, _) => 1,
-            EntityEvent::Model(_, _) => 1,
-            EntityEvent::UseNewID(_) => 2,
-            EntityEvent::UseOldID(_, _, _) => 2,
-            EntityEvent::UseBaseID(_, _, _) => 2,
-        },
+        // WorldEvent::Entity(_, _, entity_event) => match entity_event {
+        //     EntityEvent::Vertices(_) => 1,
+        //     EntityEvent::Indices(_) => 1,
+        //     EntityEvent::Texture(_) => 1,
+        //     EntityEvent::DrawMethod(_) => 1,
+        //     EntityEvent::Perspective(_, _) => 1,
+        //     EntityEvent::View(_, _) => 1,
+        //     EntityEvent::Model(_, _) => 1,
+        //     EntityEvent::UseNewID(_) => 4,
+        //     EntityEvent::UseOldID(_, _, _) => 3,
+        //     EntityEvent::UseBaseID(_, _, _) => 2,
+        // },
+        // WorldEvent::EntityBase(_, _, entity_event) => match entity_event {
+        //     EntityEvent::Vertices(_) => 1,
+        //     EntityEvent::Indices(_) => 1,
+        //     EntityEvent::Texture(_) => 1,
+        //     EntityEvent::DrawMethod(_) => 1,
+        //     EntityEvent::Perspective(_, _) => 1,
+        //     EntityEvent::View(_, _) => 1,
+        //     EntityEvent::Model(_, _) => 1,
+        //     EntityEvent::UseNewID(_) => 4,
+        //     EntityEvent::UseOldID(_, _, _) => 3,
+        //     EntityEvent::UseBaseID(_, _, _) => 2,
+        // },
+        WorldEvent::Transform(_, _, transform_event) => 1,
+        WorldEvent::TransformBase(_, _, transforms_event) => 1,
     }
 }
 
 #[derive(Clone)]
+pub enum TickAfterEvent<T: BeingType<T>> {
+    Entity(ID, ID, EntityEvent<T>),
+    BaseEntity(T, ID, EntityEvent<T>),
+}
+
+#[derive(Clone)]
 pub enum WorldEvent<T: BeingType<T>> {
-    NewBeing(T, Vec<WorldEvent<T>>),
+    NewBeing(T),
     NewBase(T),
     EndBeing(ID),
     Pos2(ID, Vec2Event),
@@ -183,8 +191,15 @@ pub enum WorldEvent<T: BeingType<T>> {
     Vel3(ID, Vec3Event),
     Acc2(ID, Vec2Event),
     Acc3(ID, Vec3Event),
-    Entity(ID, ID, EntityEvent<T>),
-    EntityBase(T, ID, EntityEvent<T>),
+    Transform(ID, ID, TransformEvent),
+    TransformBase(T, ID, TransformEvent),
+}
+
+#[derive(Clone)]
+pub enum TransformEvent {
+    Perspective(Mat4, Mat4),
+    View(Mat4, Mat4),
+    Model(Mat4, Mat4),
 }
 
 #[allow(dead_code)]
@@ -194,9 +209,6 @@ pub enum EntityEvent<T: BeingType<T>> {
     Indices(Vec<Index>),
     Texture(&'static [u8]),
     DrawMethod(DrawMethod),
-    Perspective(Mat4, Mat4),
-    View(Mat4, Mat4),
-    Model(Mat4, Mat4),
     UseNewID(Vec<EntityIDType>),
     UseOldID(ID, ID, Vec<EntityIDType>),
     UseBaseID(T, ID, Vec<EntityIDType>),

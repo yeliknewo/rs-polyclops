@@ -1,5 +1,6 @@
 use std::collections::{HashMap};
 use std::fmt::{Display, Formatter, Error};
+use std::sync::{Arc, RwLock};
 
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ID {
@@ -7,9 +8,9 @@ pub struct ID {
 }
 
 impl ID {
-    pub fn new(manager: &mut IDManager, id_type: IDType) -> ID {
+    pub fn new(manager: Arc<RwLock<IDManager>>, id_type: IDType) -> ID {
         ID {
-            id: manager.get_id(id_type),
+            id: manager.write().expect("Unable to Write Manager in New ID").get_id(id_type),
         }
     }
 
