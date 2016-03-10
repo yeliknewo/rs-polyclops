@@ -245,9 +245,9 @@ impl<'a> Frame<'a> {
             &self.program,
             &uniform!(
                 tex: &self.texture_buffers[&entity.texture_id],
-                perspective: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_perspective_mat4s()[&entity.perspective_id],
-                view: transforms.read().expect("Unable to Read Transforms in Draw Entity In Frame").get_view_mat4s()[&entity.view_id],
-                model: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_model_mat4s()[&entity.model_id],
+                perspective: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_perspective_matrix(&entity),
+                view: transforms.read().expect("Unable to Read Transforms in Draw Entity In Frame").get_view_matrix(&entity),
+                model: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_model_matrix(&entity),
             ),
             &self.draw_parameters[&entity.draw_parameters_id])
             .expect("Unable to draw Entity");
@@ -259,23 +259,23 @@ impl<'a> Frame<'a> {
 }
 
 pub struct Transforms {
-    perspective_mat4s: HashMap<ID, Mat4>,
-    perspective_mat4s_inverse: HashMap<ID, Mat4>,
-    view_mat4s: HashMap<ID, Mat4>,
-    view_mat4s_inverse: HashMap<ID, Mat4>,
-    model_mat4s: HashMap<ID, Mat4>,
-    model_mat4s_inverse: HashMap<ID, Mat4>,
+    perspective_mat4s: Arc<RwLock<HashMap<ID, Mat4>>>,
+    perspective_mat4s_inverse: Arc<RwLock<HashMap<ID, Mat4>>>,
+    view_mat4s: Arc<RwLock<HashMap<ID, Mat4>>>,
+    view_mat4s_inverse: Arc<RwLock<HashMap<ID, Mat4>>>,
+    model_mat4s: Arc<RwLock<HashMap<ID, Mat4>>>,
+    model_mat4s_inverse: Arc<RwLock<HashMap<ID, Mat4>>>,
 }
 
 impl Transforms {
     pub fn new() -> Transforms {
         Transforms {
-            perspective_mat4s: HashMap::new(),
-            perspective_mat4s_inverse: HashMap::new(),
-            view_mat4s: HashMap::new(),
-            view_mat4s_inverse: HashMap::new(),
-            model_mat4s: HashMap::new(),
-            model_mat4s_inverse: HashMap::new(),
+            perspective_mat4s: Arc::new(RwLock::new(HashMap::new())),
+            perspective_mat4s_inverse: Arc::new(RwLock::new(HashMap::new())),
+            view_mat4s: Arc::new(RwLock::new(HashMap::new())),
+            view_mat4s_inverse: Arc::new(RwLock::new(HashMap::new())),
+            model_mat4s: Arc::new(RwLock::new(HashMap::new())),
+            model_mat4s_inverse: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -292,54 +292,42 @@ impl Transforms {
     }
 
     pub fn get_perspective_matrix(&self, entity: &Entity) -> Mat4 {
-        self.perspective_mat4s[&entity.perspective_id]
+        self.perspective_mat4s.read().expect("Unable to Read Perspective Matrix in Transforms")[&entity.perspective_id]
     }
 
     pub fn get_perspective_inverse(&self, entity: &Entity) -> Mat4 {
-        self.perspective_mat4s_inverse[&entity.perspective_id]
+        self.perspective_mat4s_inverse.read().expect("Unable to Read Perspective Inverse in Transforms")[&entity.perspective_id]
     }
 
-    pub fn get_perspective_mat4s(&self) -> &HashMap<ID, Mat4> {
-        &self.perspective_mat4s
-    }
-
-    pub fn set_perspective_matrix(&mut self, entity: &Arc<RwLock<Entity>>, perspective: Mat4, inverse: Mat4) {
-        self.perspective_mat4s.insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, perspective);
-        self.perspective_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, inverse);
+    pub fn set_perspective_matrix(&self, entity: &Arc<RwLock<Entity>>, perspective: Mat4, inverse: Mat4) {
+        self.perspective_mat4s.write().expect("Unable to Write Perspective Matrix in Set Perspective Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, perspective);
+        self.perspective_mat4s_inverse.write().expect("Unable to Write Perspective Inverse in Set Perspective Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set Perspective Matrix").perspective_id, inverse);
     }
 
     pub fn get_view_matrix(&self, entity: &Entity) -> Mat4 {
-        self.view_mat4s[&entity.view_id]
+        self.view_mat4s.read().expect("Unable to Read View Matrix in Get View Matrix in Transforms")[&entity.view_id]
     }
 
     pub fn get_view_inverse(&self, entity: &Entity) -> Mat4 {
-        self.view_mat4s_inverse[&entity.view_id]
+        self.view_mat4s_inverse.read().expect("Unable to Read View Inverse in Get View Inverse in Transforms")[&entity.view_id]
     }
 
-    pub fn get_view_mat4s(&self) -> &HashMap<ID, Mat4> {
-        &self.view_mat4s
-    }
-
-    pub fn set_view_matrix(&mut self, entity: &Arc<RwLock<Entity>>, view: Mat4, inverse: Mat4) {
-        self.view_mat4s.insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, view);
-        self.view_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, inverse);
+    pub fn set_view_matrix(&self, entity: &Arc<RwLock<Entity>>, view: Mat4, inverse: Mat4) {
+        self.view_mat4s.write().expect("Unable to Write View Matrix in Set View Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, view);
+        self.view_mat4s_inverse.write().expect("Unable to Write View Inverse in Set View Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set View Matrix").view_id, inverse);
     }
 
     pub fn get_model_matrix(&self, entity: &Entity) -> Mat4 {
-        self.model_mat4s[&entity.model_id]
+        self.model_mat4s.read().expect("Unable to Read Model Matrix in Get Model Matrix in Transforms")[&entity.model_id]
     }
 
     pub fn get_model_inverse(&self, entity: &Entity) -> Mat4 {
-        self.model_mat4s_inverse[&entity.model_id]
+        self.model_mat4s_inverse.read().expect("Unable to Read Model Inverse in Get Model Inverse in Transforms")[&entity.model_id]
     }
 
-    pub fn get_model_mat4s(&self) -> &HashMap<ID, Mat4> {
-        &self.model_mat4s
-    }
-
-    pub fn set_model_matrix(&mut self, entity: &Arc<RwLock<Entity>>, model: Mat4, inverse: Mat4) {
-        self.model_mat4s.insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, model);
-        self.model_mat4s_inverse.insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, inverse);
+    pub fn set_model_matrix(&self, entity: &Arc<RwLock<Entity>>, model: Mat4, inverse: Mat4) {
+        self.model_mat4s.write().expect("Unable to Write Model Matrix in Set Model Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, model);
+        self.model_mat4s_inverse.write().expect("Unable to Write Model Inverse in Set Model Matrix in Transforms").insert(entity.read().expect("Unable to Read Entity in Set Model Matrix").model_id, inverse);
     }
 }
 

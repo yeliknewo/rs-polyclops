@@ -21,6 +21,7 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
     }
     fn get_entities(&self) -> &HashMap<ID, Arc<RwLock<Entity>>>;
     fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<WorldEvent<T>>;
+    fn tick_after(&self, &World<T>, &Transforms) -> Vec<WorldEvent<T>>;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())
     }

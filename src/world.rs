@@ -12,7 +12,7 @@ use keyboard::{Keyboard};
 
 pub struct World<T: BeingType<T>> {
     beings: HashMap<ID, Arc<RwLock<Box<Being<T>>>>>,
-    bases: HashMap<T, Arc<RwLock<Entity>>>,
+    bases: HashMap<T, Arc<RwLock<Box<Being<T>>>>>,
     mouse_pos: Vec2,
     mouse_pos_world: Vec2,
     resolution: Vec2,
@@ -51,11 +51,11 @@ impl<T: BeingType<T>> World<T> {
         self.beings.get(&id)
     }
 
-    pub fn set_base(&mut self, being_type: T, entity: Arc<RwLock<Entity>>) {
-        self.bases.insert(being_type, entity);
+    pub fn set_base(&mut self, being_type: T, base: Arc<RwLock<Box<Being<T>>>>) {
+        self.bases.insert(being_type, base);
     }
 
-    pub fn get_base(&self, being_type: T) -> Option<&Arc<RwLock<Entity>>> {
+    pub fn get_base(&self, being_type: T) -> Option<&Arc<RwLock<Box<Being<T>>>>> {
         self.bases.get(&being_type)
     }
 
@@ -155,9 +155,9 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             EntityEvent::Model(_, _) => 1,
             EntityEvent::UseNewID(_) => 2,
             EntityEvent::UseOldID(_, _, _) => 2,
-            EntityEvent::UseBaseID(_, _) => 2,
+            EntityEvent::UseBaseID(_, _, _) => 2,
         },
-        WorldEvent::EntityBase(_, entity_event) => match entity_event {
+        WorldEvent::EntityBase(_, _, entity_event) => match entity_event {
             EntityEvent::Vertices(_) => 1,
             EntityEvent::Indices(_) => 1,
             EntityEvent::Texture(_) => 1,
@@ -167,7 +167,7 @@ pub fn get_rank<T: BeingType<T>>(event: WorldEvent<T>) -> u32 {
             EntityEvent::Model(_, _) => 1,
             EntityEvent::UseNewID(_) => 2,
             EntityEvent::UseOldID(_, _, _) => 2,
-            EntityEvent::UseBaseID(_, _) => 2,
+            EntityEvent::UseBaseID(_, _, _) => 2,
         },
     }
 }
@@ -184,7 +184,7 @@ pub enum WorldEvent<T: BeingType<T>> {
     Acc2(ID, Vec2Event),
     Acc3(ID, Vec3Event),
     Entity(ID, ID, EntityEvent<T>),
-    EntityBase(T, EntityEvent<T>),
+    EntityBase(T, ID, EntityEvent<T>),
 }
 
 #[allow(dead_code)]
@@ -199,7 +199,7 @@ pub enum EntityEvent<T: BeingType<T>> {
     Model(Mat4, Mat4),
     UseNewID(Vec<EntityIDType>),
     UseOldID(ID, ID, Vec<EntityIDType>),
-    UseBaseID(T, Vec<EntityIDType>),
+    UseBaseID(T, ID, Vec<EntityIDType>),
 }
 
 #[allow(dead_code)]

@@ -22,5 +22,7 @@ mod iso_being_type {
 }
 
 impl BeingType<IBT> for IBT {
-
+    fn make_being() {
+        
+    }
 }
