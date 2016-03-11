@@ -3,10 +3,9 @@ use std::hash::{Hash};
 use std::collections::{HashMap};
 
 use utils::{ID, IDManager};
-use graphics::{Entity, Window, Transforms};
+use graphics::{Entity, Transforms};
 use world::{World, WorldEvent, TickEvent, TickAfterEvent};
 use math::{Vec2, Vec3};
-use game::{Game};
 
 pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Hash {
     fn make_being(Arc<RwLock<IDManager>>, T, Arc<RwLock<World<T>>>) -> Vec<WorldEvent<T>>;
@@ -20,7 +19,7 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
         self.get_entities().get(&id)
     }
     fn get_entities(&self) -> &HashMap<ID, Arc<RwLock<Entity>>>;
-    fn tick(&self, &World<T>, &f32, &Transforms) -> Vec<TickEvent<T>>;
+    fn tick(&self, &World<T>, &Transforms, &f32) -> Vec<TickEvent<T>>;
     fn tick_after(&self, &World<T>, &Transforms) -> Vec<TickAfterEvent<T>>;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())

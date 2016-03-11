@@ -366,7 +366,7 @@ impl Entity {
         }
     }
 
-    pub fn use_other_id(&mut self, other_arc: &Arc<RwLock<Entity>>, id_type: EntityIDType) {
+    pub fn use_old_id(&mut self, other_arc: &Arc<RwLock<Entity>>, id_type: EntityIDType) {
         let other = other_arc.read().expect("Unable to Read Other in Use Other ID");
         match id_type {
             EntityIDType::Vertex => {

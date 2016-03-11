@@ -5,7 +5,7 @@ use glium::glutin::MouseButton as GliumMouseButton;
 use glium::glutin::VirtualKeyCode as GliumKeyCode;
 
 use utils::{ID, EntityIDType};
-use graphics::{Vertex, Index, DrawMethod, Entity};
+use graphics::{Vertex, Index, DrawMethod};
 use math::{Vec2, Vec3, Mat4};
 use being::{Being, BeingType};
 use keyboard::{Keyboard};
@@ -145,32 +145,18 @@ pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
             Vec3Event::Add(_) => 16,
             Vec3Event::Mul(_) => 17,
         },
-        // TickEvent::Entity(_, _, entity_event) => match entity_event {
-        //     EntityEvent::Vertices(_) => 1,
-        //     EntityEvent::Indices(_) => 1,
-        //     EntityEvent::Texture(_) => 1,
-        //     EntityEvent::DrawMethod(_) => 1,
-        //     EntityEvent::Perspective(_, _) => 1,
-        //     EntityEvent::View(_, _) => 1,
-        //     EntityEvent::Model(_, _) => 1,
-        //     EntityEvent::UseNewID(_) => 4,
-        //     EntityEvent::UseOldID(_, _, _) => 3,
-        //     EntityEvent::UseBaseID(_, _, _) => 2,
-        // },
-        // TickEvent::EntityBase(_, _, entity_event) => match entity_event {
-        //     EntityEvent::Vertices(_) => 1,
-        //     EntityEvent::Indices(_) => 1,
-        //     EntityEvent::Texture(_) => 1,
-        //     EntityEvent::DrawMethod(_) => 1,
-        //     EntityEvent::Perspective(_, _) => 1,
-        //     EntityEvent::View(_, _) => 1,
-        //     EntityEvent::Model(_, _) => 1,
-        //     EntityEvent::UseNewID(_) => 4,
-        //     EntityEvent::UseOldID(_, _, _) => 3,
-        //     EntityEvent::UseBaseID(_, _, _) => 2,
-        // },
-        TickEvent::Transform(_, _, transform_event) => 1,
-        TickEvent::TransformBase(_, _, transforms_event) => 1,
+        TickEvent::Transform(_, _, _) => 1,
+        TickEvent::TransformBase(_, _, _) => 1,
+        TickEvent::EntityID(_, _, event) => match event {
+            EntityIDEvent::UseNewID(_) => 4,
+            EntityIDEvent::UseOldID(_, _, _) => 3,
+            EntityIDEvent::UseBaseID(_, _, _) => 2,
+        },
+        TickEvent::EntityIDBase(_, _, event) => match event {
+            EntityIDEvent::UseNewID(_) => 4,
+            EntityIDEvent::UseOldID(_, _, _) => 3,
+            EntityIDEvent::UseBaseID(_, _, _) => 2,
+        }
     }
 }
 
@@ -182,8 +168,8 @@ pub enum WorldEvent<T: BeingType<T>> {
 
 #[derive(Clone)]
 pub enum TickAfterEvent<T: BeingType<T>> {
-    Entity(ID, ID, EntityEvent<T>),
-    BaseEntity(T, ID, EntityEvent<T>),
+    Entity(ID, ID, EntityGraphicsEvent),
+    EntityBase(T, ID, EntityGraphicsEvent),
 }
 
 #[derive(Clone)]
@@ -199,8 +185,11 @@ pub enum TickEvent<T: BeingType<T>> {
     Acc3(ID, Vec3Event),
     Transform(ID, ID, TransformEvent),
     TransformBase(T, ID, TransformEvent),
+    EntityID(ID, ID, EntityIDEvent<T>),
+    EntityIDBase(T, ID, EntityIDEvent<T>),
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub enum TransformEvent {
     Perspective(Mat4, Mat4),
@@ -210,14 +199,19 @@ pub enum TransformEvent {
 
 #[allow(dead_code)]
 #[derive(Clone)]
-pub enum EntityEvent<T: BeingType<T>> {
+pub enum EntityIDEvent<T: BeingType<T>> {
+    UseNewID(Vec<EntityIDType>),
+    UseOldID(ID, ID, Vec<EntityIDType>),
+    UseBaseID(T, ID, Vec<EntityIDType>),
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+pub enum EntityGraphicsEvent {
     Vertices(Vec<Vertex>),
     Indices(Vec<Index>),
     Texture(&'static [u8]),
     DrawMethod(DrawMethod),
-    UseNewID(Vec<EntityIDType>),
-    UseOldID(ID, ID, Vec<EntityIDType>),
-    UseBaseID(T, ID, Vec<EntityIDType>),
 }
 
 #[allow(dead_code)]
