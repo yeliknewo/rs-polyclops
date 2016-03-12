@@ -12,6 +12,8 @@ pub struct Tile {
     pos: Vec3,
     vel: Vec3,
     acc: Vec3,
+    sca: Vec3,
+    rot: Vec3,
 }
 
 impl Tile {
@@ -25,6 +27,8 @@ impl Tile {
             pos: Vec3::zero(),
             vel: Vec3::zero(),
             acc: Vec3::zero(),
+            sca: Vec3::one(),
+            rot: Vec3::zero(),
         }
     }
 
@@ -40,6 +44,8 @@ impl Tile {
             pos: base.get_pos3(),
             vel: base.get_vel3(),
             acc: base.get_acc3(),
+            sca: base.get_sca3(),
+            rot: base.get_rot3(),
         }
     }
 }
@@ -64,10 +70,18 @@ impl Being<IBT> for Tile {
     fn tick_after(&self, world: &World<IBT>, transforms: &Transforms) -> Vec<TickAfterEvent<IBT>> {
         let mut events = vec!();
         for entry in self.get_entities() {
-            let mat4 = Mat4::translation_from_vec3(self.get_pos3());
+            let mat4 = Mat4::translation_from_vec3(self.get_pos3()) * Mat4::scalation_from_vec3(self.get_sca3()) * Mat4::rotation_from_vec3(self.get_rot3());
             events.push(TickAfterEvent::Transform(self.get_id(), *entry.0, TransformEvent::Model(mat4, mat4.to_inverse())))
         }
         events
+    }
+
+    fn get_sca3(&self) -> Vec3 {
+        self.sca
+    }
+
+    fn get_rot3(&self) -> Vec3 {
+        self.rot
     }
 
     fn get_pos3(&self) -> Vec3 {
@@ -80,6 +94,14 @@ impl Being<IBT> for Tile {
 
     fn get_acc3(&self) -> Vec3 {
         self.acc
+    }
+
+    fn set_sca3(&mut self, vec3: Vec3) {
+        self.sca = vec3;
+    }
+
+    fn set_rot3(&mut self, vec3: Vec3) {
+        self.rot = vec3;
     }
 
     fn set_pos3(&mut self, vec3: Vec3) {

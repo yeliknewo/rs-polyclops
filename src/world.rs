@@ -115,6 +115,26 @@ pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
         TickEvent::NewBase(_) => 200,
         TickEvent::NewBeing(_) => 100,
         TickEvent::EndBeing(_) => 0,
+        TickEvent::Sca2(_, vec2_event) => match vec2_event {
+            Vec2Event::Set(_) => 5,
+            Vec2Event::Add(_) => 6,
+            Vec2Event::Mul(_) => 7,
+        },
+        TickEvent::Sca3(_, vec3_event) => match vec3_event {
+            Vec3Event::Set(_) => 5,
+            Vec3Event::Add(_) => 6,
+            Vec3Event::Mul(_) => 7,
+        },
+        TickEvent::Rot2(_, vec2_event) => match vec2_event {
+            Vec2Event::Set(_) => 5,
+            Vec2Event::Add(_) => 6,
+            Vec2Event::Mul(_) => 7,
+        },
+        TickEvent::Rot3(_, vec3_event) => match vec3_event {
+            Vec3Event::Set(_) => 5,
+            Vec3Event::Add(_) => 6,
+            Vec3Event::Mul(_) => 7,
+        },
         TickEvent::Pos2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 5,
             Vec2Event::Add(_) => 6,
@@ -177,6 +197,10 @@ pub enum TickEvent<T: BeingType<T>> {
     NewBeing(T),
     NewBase(T),
     EndBeing(ID),
+    Sca2(ID, Vec2Event),
+    Sca3(ID, Vec3Event),
+    Rot2(ID, Vec2Event),
+    Rot3(ID, Vec3Event),
     Pos2(ID, Vec2Event),
     Pos3(ID, Vec3Event),
     Vel2(ID, Vec2Event),

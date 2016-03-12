@@ -240,16 +240,16 @@ impl<'a> Frame<'a> {
     pub fn draw_entity(&mut self, entity_arc: &Arc<RwLock<Entity>>, transforms: &Arc<RwLock<Transforms>>) {
         let entity = entity_arc.read().expect("Unable to Read Entity in Draw Entity");
         self.frame.draw(
-            &self.vertex_buffers[&entity.vertex_id],
-            &self.index_buffers[&entity.index_id],
+            self.vertex_buffers.get(&entity.vertex_id).expect("Unable to Get Vertex Buffer in Draw Entity"),
+            self.index_buffers.get(&entity.index_id).expect("Unable to Get Index Buffer in Draw Entity"),
             &self.program,
             &uniform!(
-                tex: &self.texture_buffers[&entity.texture_id],
+                tex: self.texture_buffers.get(&entity.texture_id).expect("Unable to Get Texture Buffer in Draw Entity"),
                 perspective: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_perspective_matrix(&entity),
                 view: transforms.read().expect("Unable to Read Transforms in Draw Entity In Frame").get_view_matrix(&entity),
                 model: transforms.read().expect("Unable to Read Transforms in Draw Entity in Frame").get_model_matrix(&entity),
             ),
-            &self.draw_parameters[&entity.draw_parameters_id])
+            self.draw_parameters.get(&entity.draw_parameters_id).expect("Unable to Get Draw Parameter in Draw Entity"))
             .expect("Unable to draw Entity");
     }
 
@@ -292,11 +292,11 @@ impl Transforms {
     }
 
     pub fn get_perspective_matrix(&self, entity: &Entity) -> Mat4 {
-        self.perspective_mat4s.read().expect("Unable to Read Perspective Matrix in Transforms")[&entity.perspective_id]
+        *self.perspective_mat4s.read().expect("Unable to Read Perspective Matrix in Transforms").get(&entity.perspective_id).expect("Unable to Get Perspective in Get Perspective")
     }
 
     pub fn get_perspective_inverse(&self, entity: &Entity) -> Mat4 {
-        self.perspective_mat4s_inverse.read().expect("Unable to Read Perspective Inverse in Transforms")[&entity.perspective_id]
+        *self.perspective_mat4s_inverse.read().expect("Unable to Read Perspective Inverse in Transforms").get(&entity.perspective_id).expect("Unable to Get Perspective Inverse in Get Perspective Inverse")
     }
 
     pub fn set_perspective_matrix(&self, entity: &Arc<RwLock<Entity>>, perspective: Mat4, inverse: Mat4) {
@@ -305,11 +305,11 @@ impl Transforms {
     }
 
     pub fn get_view_matrix(&self, entity: &Entity) -> Mat4 {
-        self.view_mat4s.read().expect("Unable to Read View Matrix in Get View Matrix in Transforms")[&entity.view_id]
+        *self.view_mat4s.read().expect("Unable to Read View Matrix in Get View Matrix in Transforms").get(&entity.view_id).expect("Unable to Get View in Get View")
     }
 
     pub fn get_view_inverse(&self, entity: &Entity) -> Mat4 {
-        self.view_mat4s_inverse.read().expect("Unable to Read View Inverse in Get View Inverse in Transforms")[&entity.view_id]
+        *self.view_mat4s_inverse.read().expect("Unable to Read View Inverse in Get View Inverse in Transforms").get(&entity.view_id).expect("Unable to Get View Inverse in Get View Inverse")
     }
 
     pub fn set_view_matrix(&self, entity: &Arc<RwLock<Entity>>, view: Mat4, inverse: Mat4) {
@@ -318,11 +318,11 @@ impl Transforms {
     }
 
     pub fn get_model_matrix(&self, entity: &Entity) -> Mat4 {
-        self.model_mat4s.read().expect("Unable to Read Model Matrix in Get Model Matrix in Transforms")[&entity.model_id]
+        *self.model_mat4s.read().expect("Unable to Read Model Matrix in Get Model Matrix in Transforms").get(&entity.model_id).expect("Unable to Get Model in Get Model")
     }
 
     pub fn get_model_inverse(&self, entity: &Entity) -> Mat4 {
-        self.model_mat4s_inverse.read().expect("Unable to Read Model Inverse in Get Model Inverse in Transforms")[&entity.model_id]
+        *self.model_mat4s_inverse.read().expect("Unable to Read Model Inverse in Get Model Inverse in Transforms").get(&entity.model_id).expect("Unable to Get Model Inverse in Get Model Inverse")
     }
 
     pub fn set_model_matrix(&self, entity: &Arc<RwLock<Entity>>, model: Mat4, inverse: Mat4) {

@@ -20,7 +20,11 @@ pub fn main() {
     let thread_count = 8;
 
     let mut game: Game<IBT> = Game::<IBT>::new(manager, thread_count, World::new(resolution), resolution);
-    game.run(vec!(WorldEvent::TickEvent(TickEvent::NewBase(IBT::Tile)), WorldEvent::TickEvent(TickEvent::NewBeing(IBT::Tile))), &mut window);
+    let mut events = vec!(WorldEvent::TickEvent(TickEvent::NewBase(IBT::Tile)));
+    for _ in 0..1000 {
+        events.push(WorldEvent::TickEvent(TickEvent::NewBeing(IBT::Tile)));
+    }
+    game.run(events, &mut window);
 }
 
 use self::iso_being_type::IsoBeingType as IBT;
@@ -46,7 +50,7 @@ impl BeingType<IBT> for IBT {
                 for entry in being.get_entities() {
                     events.push(WorldEvent::TickEvent(TickEvent::EntityID(id, *entry.0, EntityIDEvent::UseNewID(vec!(EntityIDType::Model)))));
                     let mat4 = Mat4::identity();
-                    events.push(WorldEvent::TickAfterEvent(TickAfterEvent::Transform(id, *entry.0, TransformEvent::Model(mat4, mat4.to_inverse()))))
+                    events.push(WorldEvent::TickAfterEvent(TickAfterEvent::Transform(id, *entry.0, TransformEvent::Model(mat4, mat4.to_inverse()))));
                 }
                 being
             },
@@ -67,10 +71,10 @@ impl BeingType<IBT> for IBT {
                 let mat4 = Mat4::identity();
                 events.push(WorldEvent::TickAfterEvent(TickAfterEvent::TransformBase(being_type.clone(), tile::ENTITY_TILE_ID, TransformEvent::Model(mat4, mat4.to_inverse()))));
                 events.push(WorldEvent::TickAfterEvent(TickAfterEvent::EntityBase(being_type.clone(), tile::ENTITY_TILE_ID, EntityGraphicsEvent::Vertices(vec!(
-                    Vertex::from(Vec2::from([0.0, 0.0])),
-                    Vertex::from(Vec2::from([1.0, 0.0])),
+                    Vertex::from(Vec2::from([-1.0, -1.0])),
+                    Vertex::from(Vec2::from([1.0, -1.0])),
                     Vertex::from(Vec2::from([1.0, 1.0])),
-                    Vertex::from(Vec2::from([0.0, 1.0])),
+                    Vertex::from(Vec2::from([-1.0, 1.0])),
                 )))));
                 events.push(WorldEvent::TickAfterEvent(TickAfterEvent::EntityBase(being_type.clone(), tile::ENTITY_TILE_ID, EntityGraphicsEvent::Indices(vec!(
                     0, 1, 2,

@@ -21,6 +21,14 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
     fn get_entities(&self) -> &HashMap<u32, Arc<RwLock<Entity>>>;
     fn tick(&self, &World<T>, &Transforms, &f32) -> Vec<TickEvent<T>>;
     fn tick_after(&self, &World<T>, &Transforms) -> Vec<TickAfterEvent<T>>;
+    fn get_sca2(&self) -> Vec2 {
+        Vec2::from(self.get_sca3())
+    }
+    fn get_sca3(&self) -> Vec3;
+    fn get_rot2(&self) -> Vec2 {
+        Vec2::from(self.get_rot3())
+    }
+    fn get_rot3(&self) -> Vec3;
     fn get_pos2(&self) -> Vec2 {
         Vec2::from(self.get_pos3())
     }
@@ -34,6 +42,44 @@ pub trait Being<T: BeingType<T>>: Send + Sync {
     }
     fn get_acc3(&self) -> Vec3;
 
+    fn set_sca2(&mut self, vec2: Vec2) {
+        let z = self.get_sca3()[2];
+        self.set_sca3(vec2.to_vec3(z));
+    }
+    fn set_sca3(&mut self, Vec3);
+    fn add_sca2(&mut self, vec2: Vec2) {
+        self.add_sca3(vec2.to_vec3(0.0));
+    }
+    fn add_sca3(&mut self, vec3: Vec3) {
+        let sca3 = self.get_sca3();
+        self.set_sca3(sca3 + vec3);
+    }
+    fn mul_sca2(&mut self, vec2: Vec2) {
+        self.mul_sca3(vec2.to_vec3(1.0));
+    }
+    fn mul_sca3(&mut self, vec3: Vec3) {
+        let sca3 = self.get_sca3();
+        self.set_sca3(sca3 * vec3);
+    }
+    fn set_rot2(&mut self, vec2: Vec2) {
+        let z = self.get_rot3()[2];
+        self.set_rot3(vec2.to_vec3(z));
+    }
+    fn set_rot3(&mut self, Vec3);
+    fn add_rot2(&mut self, vec2: Vec2) {
+        self.add_rot3(vec2.to_vec3(0.0));
+    }
+    fn add_rot3(&mut self, vec3: Vec3) {
+        let rot3 = self.get_rot3();
+        self.set_rot3(rot3 + vec3);
+    }
+    fn mul_rot2(&mut self, vec2: Vec2) {
+        self.mul_rot3(vec2.to_vec3(1.0));
+    }
+    fn mul_rot3(&mut self, vec3: Vec3) {
+        let rot3 = self.get_rot3();
+        self.set_rot3(rot3 * vec3);
+    }
     fn set_pos2(&mut self, vec2: Vec2) {
         let z = self.get_pos3()[2];
         self.set_pos3(vec2.to_vec3(z));
