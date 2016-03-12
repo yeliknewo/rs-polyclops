@@ -76,43 +76,9 @@ impl Being<IBT> for Tile {
         events
     }
 
-    fn get_sca3(&self) -> Vec3 {
-        self.sca
-    }
-
-    fn get_rot3(&self) -> Vec3 {
-        self.rot
-    }
-
-    fn get_pos3(&self) -> Vec3 {
-        self.pos
-    }
-
-    fn get_vel3(&self) -> Vec3 {
-        self.vel
-    }
-
-    fn get_acc3(&self) -> Vec3 {
-        self.acc
-    }
-
-    fn set_sca3(&mut self, vec3: Vec3) {
-        self.sca = vec3;
-    }
-
-    fn set_rot3(&mut self, vec3: Vec3) {
-        self.rot = vec3;
-    }
-
-    fn set_pos3(&mut self, vec3: Vec3) {
-        self.pos = vec3;
-    }
-
-    fn set_vel3(&mut self, vec3: Vec3) {
-        self.vel = vec3;
-    }
-
-    fn set_acc3(&mut self, vec3: Vec3) {
-        self.acc = vec3;
-    }
+    implement_being!(sca, get_sca3, set_sca3);
+    implement_being!(rot, get_rot3, set_rot3);
+    implement_being!(pos, get_pos3, set_pos3);
+    implement_being!(vel, get_vel3, set_vel3);
+    implement_being!(acc, get_acc3, set_acc3);
 }

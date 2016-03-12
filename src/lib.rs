@@ -26,3 +26,16 @@ pub fn init() -> IDManager {
     graphics::init_vertex();
     IDManager::new()
 }
+
+#[macro_export]
+macro_rules! implement_being {
+        ($field:ident, $get:ident, $set:ident) => (
+        fn $get(&self) -> $crate::Vec3 {
+            self.$field
+        }
+
+        fn $set(&mut self, vec3: $crate::Vec3) {
+            self.$field = vec3;
+        }
+    );
+}
