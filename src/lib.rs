@@ -13,6 +13,7 @@ mod world;
 mod game;
 mod being;
 mod keyboard;
+mod being_args;
 
 pub use self::graphics::{method_to_parameters, Transforms, Window, WindowArgs, Entity, Vertex, Index, DrawMethod, DepthTestMethod, CullingMethod};
 pub use self::utils::{UNSET, ID, IDManager, IDType, EntityIDType};
@@ -21,6 +22,7 @@ pub use self::being::{Being, BeingType};
 pub use self::world::{World, WorldEvent, TickEvent, TickAfterEvent, TransformEvent, EntityGraphicsEvent, EntityIDEvent, Vec2Event, Vec3Event};
 pub use self::game::{Game};
 pub use self::keyboard::{Keyboard};
+pub use self::being_args::{BeingArgs};
 
 pub fn init() -> IDManager {
     graphics::init_vertex();

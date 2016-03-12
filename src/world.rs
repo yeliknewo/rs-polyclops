@@ -9,6 +9,7 @@ use graphics::{Vertex, Index, DrawMethod};
 use math::{Vec2, Vec3, Mat4};
 use being::{Being, BeingType};
 use keyboard::{Keyboard};
+use being_args::{BeingArgs};
 
 pub struct World<T: BeingType<T>> {
     beings: HashMap<ID, Arc<RwLock<Box<Being<T>>>>>,
@@ -110,11 +111,17 @@ impl<T: BeingType<T>> World<T> {
     }
 }
 
-pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
+pub fn get_rank_tick_after<T: BeingType<T>>(event: TickAfterEvent<T>) -> u32 {
+    match event {
+        TickAfterEvent::EndBeing(_) => 0,
+        _ => 1,
+    }
+}
+
+pub fn get_rank_tick<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
     match event {
         TickEvent::NewBase(_) => 200,
-        TickEvent::NewBeing(_) => 100,
-        TickEvent::EndBeing(_) => 0,
+        TickEvent::NewBeing(_, _) => 100,
         TickEvent::Sca2(_, vec2_event) => match vec2_event {
             Vec2Event::Set(_) => 5,
             Vec2Event::Add(_) => 6,
@@ -174,29 +181,29 @@ pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
             EntityIDEvent::UseNewID(_) => 4,
             EntityIDEvent::UseOldID(_, _, _) => 3,
             EntityIDEvent::UseBaseID(_, _, _) => 2,
-        }
+        },
+        TickEvent::Transform(_, _, _) => 1,
+        TickEvent::TransformBase(_, _, _) => 1,
     }
 }
 
 #[derive(Clone)]
 pub enum WorldEvent<T: BeingType<T>> {
-    TickEvent(TickEvent<T>),
-    TickAfterEvent(TickAfterEvent<T>),
+    Tick(TickEvent<T>),
+    TickAfter(TickAfterEvent<T>),
 }
 
 #[derive(Clone)]
 pub enum TickAfterEvent<T: BeingType<T>> {
     Entity(ID, u32, EntityGraphicsEvent),
     EntityBase(T, u32, EntityGraphicsEvent),
-    Transform(ID, u32, TransformEvent),
-    TransformBase(T, u32, TransformEvent),
+    EndBeing(ID),
 }
 
 #[derive(Clone)]
 pub enum TickEvent<T: BeingType<T>> {
-    NewBeing(T),
+    NewBeing(T, BeingArgs),
     NewBase(T),
-    EndBeing(ID),
     Sca2(ID, Vec2Event),
     Sca3(ID, Vec3Event),
     Rot2(ID, Vec2Event),
@@ -209,6 +216,8 @@ pub enum TickEvent<T: BeingType<T>> {
     Acc3(ID, Vec3Event),
     EntityID(ID, u32, EntityIDEvent<T>),
     EntityIDBase(T, u32, EntityIDEvent<T>),
+    Transform(ID, u32, TransformEvent),
+    TransformBase(T, u32, TransformEvent),
 }
 
 #[allow(dead_code)]

@@ -6,9 +6,10 @@ use utils::{ID, IDManager};
 use graphics::{Entity, Transforms};
 use world::{World, WorldEvent, TickEvent, TickAfterEvent};
 use math::{Vec2, Vec3};
+use being_args::{BeingArgs};
 
 pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Hash {
-    fn make_being(Arc<RwLock<IDManager>>, T, Arc<RwLock<World<T>>>) -> Vec<WorldEvent<T>>;
+    fn make_being(Arc<RwLock<IDManager>>, T, Arc<RwLock<World<T>>>, BeingArgs) -> Vec<WorldEvent<T>>;
     fn make_base(Arc<RwLock<IDManager>>, T, Arc<RwLock<World<T>>>) -> Vec<WorldEvent<T>>;
 }
 

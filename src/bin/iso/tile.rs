@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap};
-use polyclops::{Being, ID, IDManager, IDType, Entity, TickEvent, TickAfterEvent, TransformEvent, World, Transforms, Vec3, Mat4};
+use polyclops::{Being, ID, IDManager, IDType, Entity, TickEvent, TickAfterEvent, TransformEvent, World, Transforms, Vec3, Mat4, BeingArgs};
 
 use iso::iso_being_type::IsoBeingType as IBT;
 
@@ -32,20 +32,40 @@ impl Tile {
         }
     }
 
-    pub fn new_from_base(manager: Arc<RwLock<IDManager>>, base: &Arc<RwLock<Box<Being<IBT>>>>) -> Tile {
+    pub fn new_from_base(manager: Arc<RwLock<IDManager>>, base: &Arc<RwLock<Box<Being<IBT>>>>, being_args: BeingArgs) -> Tile {
         let base = base.read().expect("Unable to Read Base in New From Base in Tile");
         let mut entities: HashMap<u32, Arc<RwLock<Entity>>> = HashMap::new();
         for entry in base.get_entities() {
             entities.insert(*entry.0, Arc::new(RwLock::new(Entity::new_from(entry.1))));
         }
+        let pos = match being_args.pos {
+            Some(b) => *b,
+            None => base.get_pos3(),
+        };
+        let vel = match being_args.vel {
+            Some(b) => *b,
+            None => base.get_vel3(),
+        };
+        let acc = match being_args.acc {
+            Some(b) => *b,
+            None => base.get_acc3(),
+        };
+        let sca = match being_args.sca {
+            Some(b) => *b,
+            None => base.get_sca3(),
+        };
+        let rot = match being_args.rot {
+            Some(b) => *b,
+            None => base.get_rot3(),
+        };
         Tile {
             entities: entities,
             id: ID::new(manager, IDType::Being),
-            pos: base.get_pos3(),
-            vel: base.get_vel3(),
-            acc: base.get_acc3(),
-            sca: base.get_sca3(),
-            rot: base.get_rot3(),
+            pos: pos,
+            vel: vel,
+            acc: acc,
+            sca: sca,
+            rot: rot,
         }
     }
 }
@@ -64,15 +84,16 @@ impl Being<IBT> for Tile {
     }
 
     fn tick(&self, world: &World<IBT>, transforms: &Transforms, delta_time: &f32) -> Vec<TickEvent<IBT>> {
-        vec!()
+        let mut events = vec!();
+        for entry in self.get_entities() {
+            let mat4 = Mat4::translation_from_vec3(self.get_pos3()) * Mat4::scalation_from_vec3(self.get_sca3()) * Mat4::rotation_from_vec3(self.get_rot3());
+            events.push(TickEvent::Transform(self.get_id(), *entry.0, TransformEvent::Model(mat4, mat4.to_inverse())))
+        }
+        events
     }
 
     fn tick_after(&self, world: &World<IBT>, transforms: &Transforms) -> Vec<TickAfterEvent<IBT>> {
         let mut events = vec!();
-        for entry in self.get_entities() {
-            let mat4 = Mat4::translation_from_vec3(self.get_pos3()) * Mat4::scalation_from_vec3(self.get_sca3()) * Mat4::rotation_from_vec3(self.get_rot3());
-            events.push(TickAfterEvent::Transform(self.get_id(), *entry.0, TransformEvent::Model(mat4, mat4.to_inverse())))
-        }
         events
     }
 

@@ -9,7 +9,7 @@ use scoped_threadpool::{Pool};
 use time::{precise_time_s};
 
 use utils::{ID, IDManager, IDType};
-use world::{World, WorldEvent, TickEvent, TickAfterEvent, EntityGraphicsEvent, EntityIDEvent, TransformEvent, Vec2Event, Vec3Event, get_rank};
+use world::{World, WorldEvent, TickEvent, TickAfterEvent, EntityGraphicsEvent, EntityIDEvent, TransformEvent, Vec2Event, Vec3Event, get_rank_tick, get_rank_tick_after};
 use graphics::{Window, Transforms, method_to_parameters};
 use being::{BeingType, Being};
 use math::{Vec2};
@@ -26,9 +26,10 @@ pub struct Game<T: BeingType<T>> {
     mouse_buttons: HashMap<GliumMouseButton, GliumElementState>,
     transforms: Arc<RwLock<Transforms>>,
     manager: Arc<RwLock<IDManager>>,
-    ranked_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<TickEvent<T>>>>>>>,
-    tick_after_events: Arc<RwLock<Vec<TickAfterEvent<T>>>>,
-    ranks: Arc<RwLock<Vec<u32>>>,
+    ranked_tick_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<TickEvent<T>>>>>>>,
+    ranked_tick_after_events: Arc<RwLock<HashMap<u32, Arc<RwLock<Vec<TickAfterEvent<T>>>>>>>,
+    tick_ranks: Arc<RwLock<Vec<u32>>>,
+    tick_after_ranks: Arc<RwLock<Vec<u32>>>,
 }
 
 impl<T: BeingType<T>> Game<T> {
@@ -49,9 +50,10 @@ impl<T: BeingType<T>> Game<T> {
             mouse_buttons: HashMap::new(),
             transforms: Arc::new(RwLock::new(Transforms::new())),
             manager: manager,
-            ranked_events: Arc::new(RwLock::new(HashMap::new())),
-            tick_after_events: Arc::new(RwLock::new(vec!())),
-            ranks: Arc::new(RwLock::new(vec!()))
+            ranked_tick_events: Arc::new(RwLock::new(HashMap::new())),
+            ranked_tick_after_events: Arc::new(RwLock::new(HashMap::new())),
+            tick_ranks: Arc::new(RwLock::new(vec!())),
+            tick_after_ranks: Arc::new(RwLock::new(vec!())),
         }
     }
 
@@ -154,13 +156,13 @@ impl<T: BeingType<T>> Game<T> {
                 {
                     let tps_f32 = tps_s as f32;
                     let events = self.tick(tps_f32);
-                    self.expand_events(events);
-                    self.execute_events(tps_f32);
-                    self.clear_tick_executions();
+                    self.expand_tick_events(events);
+                    self.execute_tick_events(tps_f32);
+                    //self.clear_tick_executions();
                     let events = self.tick_after();
-                    self.fill_tick_after_events(events);
+                    self.expand_tick_after_events(events);
                     self.execute_tick_after_events(window);
-                    self.clear_tick_after_executions();
+                    //self.clear_tick_after_executions();
                 }
                 delta_time -= tps_s;
                 ticks += 1;
@@ -178,13 +180,69 @@ impl<T: BeingType<T>> Game<T> {
 
     fn render(&mut self, window: &mut Window) {
         let mut frame = window.frame();
-        // for entry in self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Render").read().expect("Unable to Read World when rendering").get_beings() {
-        //     let being = entry.1;
-        //     for entity in being.read().expect("Unable to Read Being when rendering").get_entities() {
-        //         frame.draw_entity(entity.1, &self.transforms);
-        //     }
-        // }
+        for entry in self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Render").read().expect("Unable to Read World when rendering").get_beings() {
+            let being = entry.1;
+            for entity in being.read().expect("Unable to Read Being when rendering").get_entities() {
+                frame.draw_entity(entity.1, &self.transforms);
+            }
+        }
         frame.end();
+    }
+
+    fn starting_events(&mut self, window: &mut Window, delta_time: f32, events: Arc<RwLock<Vec<WorldEvent<T>>>>) {
+        let events_split = self.split_events(events);
+        self.expand_tick_events(events_split.0);
+        self.execute_tick_events(delta_time);
+        //self.clear_tick_executions();
+        self.expand_tick_after_events(events_split.1);
+        self.execute_tick_after_events(window);
+        //self.clear_tick_after_executions();
+    }
+
+    fn split_events(&self, events: Arc<RwLock<Vec<WorldEvent<T>>>>) -> (Arc<RwLock<Vec<TickEvent<T>>>>, Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
+        let tick: Arc<RwLock<Vec<TickEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+        let after: Arc<RwLock<Vec<TickAfterEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+        {
+            let mut events = events.write().expect("Unable to Write Events in Split Events");
+            let mut tick = tick.write().expect("Unable to Write Tick in Split Events");
+            let mut after = after.write().expect("Unable to Write After in Split Events");
+            loop {
+                match events.pop() {
+                    Some(event) => match event {
+                        WorldEvent::Tick(event) => tick.push(event),
+                        WorldEvent::TickAfter(event) => after.push(event),
+                    },
+                    None => break,
+                }
+            }
+        }
+        (tick, after)
+    }
+
+    fn tick_after(&mut self) -> Arc<RwLock<Vec<TickAfterEvent<T>>>> {
+        let events_arc: Arc<RwLock<Vec<TickAfterEvent<T>>>> = Arc::new(RwLock::new(vec!()));
+        let active_world = self.worlds.remove(&self.active_world_id).expect("Unable to Find Active World in Tick After");
+        {
+            let transforms = &self.transforms;
+            self.thread_pool.scoped(|scope| {
+                for entry in active_world.read().expect("Unable to Read Active World in Tick After").get_beings() {
+                    let being = entry.1.clone();
+                    let world = active_world.clone();
+                    let events = events_arc.clone();
+                    let transforms = transforms.clone();
+                    scope.execute(move || {
+                        let being_read = being.read().expect("Unable to Read Being in Tick After");
+                        let tick_after_events = being_read.tick_after(&world.read().expect("Unable to Read World in Tick After"), &transforms.read().expect("Unable to Read Transforms in Tick After"));
+                        let mut events = events.write().expect("Unable to Write Events in Tick After");
+                        for event in tick_after_events {
+                            events.push(event);
+                        }
+                    });
+                }
+            });
+        }
+        self.worlds.insert(self.active_world_id, active_world);
+        events_arc
     }
 
     fn tick(&mut self, delta_time: f32) -> Arc<RwLock<Vec<TickEvent<T>>>> {
@@ -215,196 +273,138 @@ impl<T: BeingType<T>> Game<T> {
         events_arc
     }
 
-    fn fill_tick_after_events(&mut self, events: Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
-        self.tick_after_events.write().expect("Unable to Write Tick After Events in Fill Tick After Events").append(&mut events.write().expect("Unable to Write Events in Fill Tick After Events"));
-    }
+    // fn clear_tick_after_executions(&mut self) {
+    //     for entry in self.ranked_tick_after_events.read().expect("Unable to Read Ranked Tick After Events in Clear Tick After Executions").iter() {
+    //         entry.1.write().expect("Unable to Write Tick After Event Rank in Clear Tick After Executions").clear();
+    //     }
+    //     self.tick_after_ranks.write().expect("Unable to Write Tick After Ranks in Clear Tick After Executions").clear();
+    // }
+    //
+    // fn clear_tick_executions(&mut self) {
+    //     for entry in self.ranked_tick_events.read().expect("Unable to Read Ranked Tick Events in Clear Tick Executions").iter() {
+    //         entry.1.write().expect("Unable to Write Tick Event Rank in Clear Tick Executions").clear();
+    //     }
+    //     self.tick_ranks.write().expect("Unable to Write Tick Ranks in Clear Tick Executions").clear();
+    // }
 
-    fn tick_after(&mut self) -> Arc<RwLock<Vec<TickAfterEvent<T>>>> {
-        let events_arc: Arc<RwLock<Vec<TickAfterEvent<T>>>> = Arc::new(RwLock::new(vec!()));
-        let active_world = self.worlds.remove(&self.active_world_id).expect("Unable to Find Active World in Tick After");
-        {
-            let transforms = &self.transforms;
-            self.thread_pool.scoped(|scope| {
-                for entry in active_world.read().expect("Unable to Read Active World in Tick After").get_beings() {
-                    let being = entry.1.clone();
-                    let world = active_world.clone();
-                    let events = events_arc.clone();
-                    let transforms = transforms.clone();
-                    scope.execute(move || {
-                        let being_read = being.read().expect("Unable to Read Being in Tick After");
-                        let tick_after_events = being_read.tick_after(&world.read().expect("Unable to Read World in Tick After"), &transforms.read().expect("Unable to Read Transforms in Tick After"));
-                        let mut events = events.write().expect("Unable to Write Events in Tick After");
-                        for event in tick_after_events {
-                            events.push(event);
-                        }
-                    });
-                }
-            });
-        }
-        self.worlds.insert(self.active_world_id, active_world);
-        events_arc
-    }
-
-    fn execute_tick_after_events(&mut self, window: &mut Window) {
-        let mut events = self.tick_after_events.write().expect("Unable to Write Events in Execute Tick After Events");
-        loop {
-            match events.pop() {
-                Some(event) => match event {
-                    TickAfterEvent::Entity(being_id, entity_id, entity_event) => match entity_event {
-                        EntityGraphicsEvent::Vertices(vertices) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                            window.set_vertices(entity, vertices);
-                        },
-                        EntityGraphicsEvent::Indices(indices) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                            window.set_indices(entity, indices);
-                        },
-                        EntityGraphicsEvent::Texture(texture) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                            window.set_texture(entity, texture);
-                        },
-                        EntityGraphicsEvent::DrawMethod(draw_method) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                            window.set_draw_parameters(entity, method_to_parameters(draw_method));
-                        },
-                    },
-                    TickAfterEvent::EntityBase(being_type, entity_id, entity_base_event) => match entity_base_event {
-                        EntityGraphicsEvent::Vertices(vertices) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Vertices Execute Events");
-                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Vertices in Execute Events").read().expect("Unable to Read Base in Entity Base Vertices in Execute Events");
-                            window.set_vertices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Vertices in Execute Events"), vertices);
-                        },
-                        EntityGraphicsEvent::Indices(indices) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Indices in Execute Events");
-                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Indices in Execute Events").read().expect("Unable to Read Base in Entity Base Indices in Execute Events");
-                            window.set_indices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Indices in Execute Events"), indices);
-                        },
-                        EntityGraphicsEvent::Texture(texture) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Texture in Execute Events");
-                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Texture in Execute Events").read().expect("Unable to Read Base in Entity Base Texture in Execute Events");
-                            window.set_texture(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Texture in Execute Events"), texture);
-                        },
-                        EntityGraphicsEvent::DrawMethod(draw_method) => {
-                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Draw Method in Execute Events");
-                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Draw Method in Execute Events").read().expect("Unable to Read Base in Entity Base Draw Method in Execute Events");
-                            window.set_draw_parameters(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Draw Method in Execute Events"), method_to_parameters(draw_method));
-                        },
-                    },
-                    TickAfterEvent::Transform(being_id, entity_id, transform_event) => {
-                        match transform_event {
-                            TransformEvent::Perspective(matrix, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms in Entity Perspective in Execute Events").set_perspective_matrix(entity, matrix, inverse);
-                            },
-                            TransformEvent::View(matrix, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms in Entity View in Execute Events").set_view_matrix(entity, matrix, inverse);
-                            },
-                            TransformEvent::Model(matrix, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
-                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Model in Execute Events").read().expect("Unable to Read Being in Entity Model in Execute Events");
-                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Model in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms in Entity Model in Execute Events").set_model_matrix(entity, matrix, inverse);
-                            },
-                        }
-                    },
-                    TickAfterEvent::TransformBase(being_type, entity_id, transform_event) => {
-                        match transform_event {
-                            TransformEvent::Perspective(perspective, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Perspective in Execute Events");
-                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Perspective in Execute Events").read().expect("Unable to Read Base in Entity Base Perspective in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms in Entity Base Perspective in Execute Events").set_perspective_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Perspective in Execute Events"), perspective, inverse);
-                            },
-                            TransformEvent::View(view, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base View in Execute Events");
-                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base View in Execute Events").read().expect("Unable to Read Base in Entity Base View in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms Entity Base View in Execute Events").set_view_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base View in Execute Events"), view, inverse);
-                            },
-                            TransformEvent::Model(model, inverse) => {
-                                let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Model in Execute Events");
-                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Model in Execute Events").read().expect("Unable to Read Base in Entity Base Model in Execute Events");
-                                self.transforms.read().expect("Unable to Read Transforms in Entity Base Model in Execute Events").set_model_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Model in Execute Events"), model, inverse);
-                            },
-                        }
-                    },
-                },
-                None => break,
-            }
-        }
-    }
-
-    fn starting_events(&mut self, window: &mut Window, delta_time: f32, events: Arc<RwLock<Vec<WorldEvent<T>>>>) {
-        let events_split = self.split_events(events);
-        self.expand_events(events_split.0);
-        self.execute_events(delta_time);
-        self.clear_tick_executions();
-        self.fill_tick_after_events(events_split.1);
-        self.execute_tick_after_events(window);
-        self.clear_tick_after_executions();
-    }
-
-    fn split_events(&self, events: Arc<RwLock<Vec<WorldEvent<T>>>>) -> (Arc<RwLock<Vec<TickEvent<T>>>>, Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
-        let tick: Arc<RwLock<Vec<TickEvent<T>>>> = Arc::new(RwLock::new(vec!()));
-        let after: Arc<RwLock<Vec<TickAfterEvent<T>>>> = Arc::new(RwLock::new(vec!()));
-        {
-            let mut events = events.write().expect("Unable to Write Events in Split Events");
-            let mut tick = tick.write().expect("Unable to Write Tick in Split Events");
-            let mut after = after.write().expect("Unable to Write After in Split Events");
-            loop {
-                match events.pop() {
-                    Some(event) => match event {
-                        WorldEvent::TickEvent(event) => tick.push(event),
-                        WorldEvent::TickAfterEvent(event) => after.push(event),
-                    },
-                    None => break,
-                }
-            }
-        }
-        (tick, after)
-    }
-
-    fn clear_tick_executions(&mut self) {
-        self.ranked_events.write().expect("Unable to Write Ranked Events in Clear Tick Executions").clear();
-        self.ranks.write().expect("Unable to Write Ranks in Clear Executions").clear();
-    }
-
-    fn clear_tick_after_executions(&mut self) {
-        self.tick_after_events.write().expect("Unable to Write Ranked Tick After Events in Clear Tick After Executions").clear();
-    }
-
-    fn expand_events(&mut self, events: Arc<RwLock<Vec<TickEvent<T>>>>) {
-        let mut events = events.write().expect("Unable to Write Events in Expand Events");
+    fn expand_tick_after_events(&mut self, events: Arc<RwLock<Vec<TickAfterEvent<T>>>>) {
+        let mut events = events.write().expect("Unable to Write Events in Expand Tick After Events");
         loop {
             match events.pop() {
                 Some(event) => {
-                    let rank = get_rank(event.clone());
-                    self.ranks.write().expect("Unable to Write Ranks in Execute Events").push(rank);
-                    if !self.ranked_events.read().expect("Unable to Read Ranked Events in Execute Events").contains_key(&rank) {
-                        self.ranked_events.write().expect("Unable to Write Ranked Events in Execute Events").insert(rank, Arc::new(RwLock::new(vec!())));
+                    let rank = get_rank_tick_after(event.clone());
+                    self.tick_after_ranks.write().expect("Unable to Write Tick After Ranks in Expand Tick After Events").push(rank);
+                    if !self.ranked_tick_after_events.read().expect("Unable to Read Ranked Tick After Events in Expand Tick After Events").contains_key(&rank) {
+                        self.ranked_tick_after_events.write().expect("Unable to Write Ranked Tick After Events in Expand Tick After Events").insert(rank, Arc::new(RwLock::new(vec!())));
                     }
-                    let ranked = self.ranked_events.read().expect("Unable to Read Ranked Events in Execute Events");
-                    ranked.get(&rank).expect("Unable to Get Rank in Expand Events").write().expect("Unable to Write Ranked Events in Execute Events").push(event);
+                    let ranked = self.ranked_tick_after_events.read().expect("Unable to Read Ranked Tick After Events in Expand Tick After Events");
+                    ranked.get(&rank).expect("Unable to Get Rank in Expand Tick After Events").write().expect("Unable to Write Ranked Tick After Events in Expand Tick After Events").push(event);
                 },
                 None => break,
             }
         }
     }
 
-    fn execute_events(&mut self, delta_time: f32) {
+    fn expand_tick_events(&mut self, events: Arc<RwLock<Vec<TickEvent<T>>>>) {
+        let mut events = events.write().expect("Unable to Write Events in Expand Tick Events");
+        loop {
+            match events.pop() {
+                Some(event) => {
+                    let rank = get_rank_tick(event.clone());
+                    self.tick_ranks.write().expect("Unable to Write Tick Ranks in Expand Tick Events").push(rank);
+                    if !self.ranked_tick_events.read().expect("Unable to Read Ranked Tick Events in Expand Tick Events").contains_key(&rank) {
+                        self.ranked_tick_events.write().expect("Unable to Write Ranked Tick Events in Expand Tick Events").insert(rank, Arc::new(RwLock::new(vec!())));
+                    }
+                    let ranked = self.ranked_tick_events.read().expect("Unable to Read Ranked Tick Events in Expand Tick Events");
+                    ranked.get(&rank).expect("Unable to Get Rank in Expand Tick Events").write().expect("Unable to Write Ranked Tick Events in Expand Tick Events").push(event);
+                },
+                None => break,
+            }
+        }
+    }
+
+    fn execute_tick_after_events(&mut self, window: &mut Window) {
         {
-            let mut ranks_write = self.ranks.write().expect("Unable to Write Ranks for Sorting in Execute Events");
+            let mut ranks_write = self.tick_after_ranks.write().expect("unable to Write Tick After Ranks in Execute Tick After Events");
+            ranks_write.sort_by(|a, b| a.cmp(b));
+            ranks_write.dedup();
+        }
+        loop {
+            let rank = self.tick_after_ranks.write().expect("Unable to Write Tick After Ranks in Execute Tick After Events").pop();
+            match rank {
+                Some(rank) => {
+                    let ranked_events = self.ranked_tick_after_events.read().expect("Unable to Read Ranked Tick After Events in Execute Tick After Events");
+                    let mut ranked_events_vec = ranked_events.get(&rank).expect("Unable to Get Rank in Execute Tick After Events").write().expect("Unable to Write Ranked Events in Execute Tick After Events");
+                    loop {
+                        match ranked_events_vec.pop() {
+                            Some(event) => {
+                                match event {
+                                    TickAfterEvent::EndBeing(id) => {
+                                        let mut world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").write().expect("Unable to Write Active World in Execute Events");
+                                        world.del_being(id);
+                                    },
+                                    TickAfterEvent::Entity(being_id, entity_id, entity_event) => match entity_event {
+                                        EntityGraphicsEvent::Vertices(vertices) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
+                                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                            window.set_vertices(entity, vertices);
+                                        },
+                                        EntityGraphicsEvent::Indices(indices) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
+                                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                            window.set_indices(entity, indices);
+                                        },
+                                        EntityGraphicsEvent::Texture(texture) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
+                                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                            window.set_texture(entity, texture);
+                                        },
+                                        EntityGraphicsEvent::DrawMethod(draw_method) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Execute Events");
+                                            let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                            let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                            window.set_draw_parameters(entity, method_to_parameters(draw_method));
+                                        },
+                                    },
+                                    TickAfterEvent::EntityBase(being_type, entity_id, entity_base_event) => match entity_base_event {
+                                        EntityGraphicsEvent::Vertices(vertices) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Vertices Execute Events");
+                                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Vertices in Execute Events").read().expect("Unable to Read Base in Entity Base Vertices in Execute Events");
+                                            window.set_vertices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Vertices in Execute Events"), vertices);
+                                        },
+                                        EntityGraphicsEvent::Indices(indices) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Indices in Execute Events");
+                                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Indices in Execute Events").read().expect("Unable to Read Base in Entity Base Indices in Execute Events");
+                                            window.set_indices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Indices in Execute Events"), indices);
+                                        },
+                                        EntityGraphicsEvent::Texture(texture) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Texture in Execute Events");
+                                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Texture in Execute Events").read().expect("Unable to Read Base in Entity Base Texture in Execute Events");
+                                            window.set_texture(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Texture in Execute Events"), texture);
+                                        },
+                                        EntityGraphicsEvent::DrawMethod(draw_method) => {
+                                            let world = self.worlds.get(&self.active_world_id).expect("Unable to Get Active World in Execute Events").read().expect("Unable to Read Active World in Entity Base Draw Method in Execute Events");
+                                            let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Draw Method in Execute Events").read().expect("Unable to Read Base in Entity Base Draw Method in Execute Events");
+                                            window.set_draw_parameters(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Draw Method in Execute Events"), method_to_parameters(draw_method));
+                                        },
+                                    },
+                                };
+                            },
+                            None => break,
+                        }
+                    }
+                },
+                None => break,
+            }
+        }
+    }
+
+    fn execute_tick_events(&mut self, delta_time: f32) {
+        {
+            let mut ranks_write = self.tick_ranks.write().expect("Unable to Write Ranks for Sorting in Execute Events");
             ranks_write.sort_by(|a, b| a.cmp(b));
             ranks_write.dedup();
         }
@@ -413,12 +413,13 @@ impl<T: BeingType<T>> Game<T> {
             let re_execute = &re_execute;
             let re_execute_buffer: Arc<RwLock<Vec<WorldEvent<T>>>> = Arc::new(RwLock::new(vec!()));
             {
-                let ranks = self.ranks.clone();
+                let ranks = self.tick_ranks.clone();
                 let world = self.worlds.remove(&self.active_world_id).expect("Unable to Remove Active World in Execute Events");
                 let manager = &self.manager;
-                let ranked_events = &self.ranked_events;
+                let ranked_events = &self.ranked_tick_events;
                 let executing = AtomicBool::new(true);
                 let rank_is_good = AtomicBool::new(true);
+                let transforms = &self.transforms;
                 self.thread_pool.scoped(|scope| {
                     let executing = &executing;
                     while executing.load(Ordering::Relaxed) {
@@ -431,6 +432,7 @@ impl<T: BeingType<T>> Game<T> {
                                         let events_arc = ranked_events.clone();
                                         let active_world = world.clone();
                                         let manager = manager.clone();
+                                        let transforms = transforms.clone();
                                         let re_execute_buffer = re_execute_buffer.clone();
                                         scope.execute(move || {
                                             let events = events_arc.read().expect("Unable to Read Events in Execute Events");
@@ -438,32 +440,27 @@ impl<T: BeingType<T>> Game<T> {
                                             let event_option  = events_vec.write().expect("Unable to Write Events Vec in Execute Events").pop();
                                             let events_new_option = match event_option {
                                                 Some(event) => match event {
-                                                    TickEvent::NewBeing(being_type) => {
-                                                        Some(T::make_being(manager, being_type, active_world))
+                                                    TickEvent::NewBeing(being_type, being_args) => {
+                                                        Some(T::make_being(manager, being_type, active_world, being_args))
                                                     },
                                                     TickEvent::NewBase(being_type) => {
                                                         Some(T::make_base(manager, being_type, active_world))
-                                                    },
-                                                    TickEvent::EndBeing(id) => {
-                                                        let mut world = active_world.write().expect("Unable to Write Active World in Execute Events");
-                                                        world.del_being(id);
-                                                        None
                                                     },
                                                     TickEvent::Sca2(id, vec2_event) => {
                                                         match vec2_event {
                                                             Vec2Event::Set(vec2) => {
                                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-                                                                world.get_being(id).expect("Unable to Get Being in Set Pos2 in Execute Events").write().expect("Unable to Write Being in Set Pos2 in Execute Events")
+                                                                world.get_being(id).expect("Unable to Get Being in Set Sca2 in Execute Events").write().expect("Unable to Write Being in Set Pos2 in Execute Events")
                                                                 .set_sca2(vec2);
                                                             },
                                                             Vec2Event::Add(vec2) => {
                                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-                                                                world.get_being(id).expect("Unable to Get Being in Add Pos2 in Execute Events").write().expect("Unable to Write Being in Add Pos2 in Execute Events")
+                                                                world.get_being(id).expect("Unable to Get Being in Add Sca2 in Execute Events").write().expect("Unable to Write Being in Add Pos2 in Execute Events")
                                                                 .add_sca2(vec2);
                                                             },
                                                             Vec2Event::Mul(vec2) => {
                                                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-                                                                world.get_being(id).expect("Unable to Get Being in Mul Pos2 in Execute Events").write().expect("Unable to Write Being in Mul Pos2 in Execute Events")
+                                                                world.get_being(id).expect("Unable to Get Being in Mul Sca2 in Execute Events").write().expect("Unable to Write Being in Mul Pos2 in Execute Events")
                                                                 .mul_sca2(vec2);
                                                             },
                                                         };
@@ -715,6 +712,49 @@ impl<T: BeingType<T>> Game<T> {
                                                         };
                                                         None
                                                     },
+                                                    TickEvent::Transform(being_id, entity_id, transform_event) => {
+                                                        match transform_event {
+                                                            TransformEvent::Perspective(matrix, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Execute Events");
+                                                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms in Entity Perspective in Execute Events").set_perspective_matrix(entity, matrix, inverse);
+                                                            },
+                                                            TransformEvent::View(matrix, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Execute Events");
+                                                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
+                                                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms in Entity View in Execute Events").set_view_matrix(entity, matrix, inverse);
+                                                            },
+                                                            TransformEvent::Model(matrix, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Execute Events");
+                                                                let being = world.get_being(being_id).expect("Unable to Get Being in Entity Model in Execute Events").read().expect("Unable to Read Being in Entity Model in Execute Events");
+                                                                let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Model in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms in Entity Model in Execute Events").set_model_matrix(entity, matrix, inverse);
+                                                            },
+                                                        };
+                                                        None
+                                                    },
+                                                    TickEvent::TransformBase(being_type, entity_id, transform_event) => {
+                                                        match transform_event {
+                                                            TransformEvent::Perspective(perspective, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Entity Base Perspective in Execute Events");
+                                                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Perspective in Execute Events").read().expect("Unable to Read Base in Entity Base Perspective in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms in Entity Base Perspective in Execute Events").set_perspective_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Perspective in Execute Events"), perspective, inverse);
+                                                            },
+                                                            TransformEvent::View(view, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Entity Base View in Execute Events");
+                                                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base View in Execute Events").read().expect("Unable to Read Base in Entity Base View in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms Entity Base View in Execute Events").set_view_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base View in Execute Events"), view, inverse);
+                                                            },
+                                                            TransformEvent::Model(model, inverse) => {
+                                                                let world = active_world.read().expect("Unable to Read Active World in Entity Base Model in Execute Events");
+                                                                let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Model in Execute Events").read().expect("Unable to Read Base in Entity Base Model in Execute Events");
+                                                                transforms.read().expect("Unable to Read Transforms in Entity Base Model in Execute Events").set_model_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Model in Execute Events"), model, inverse);
+                                                            },
+                                                        };
+                                                        None
+                                                    },
                                                 },
                                                 None => {
                                                     rank_is_good.store(false, Ordering::Relaxed);
@@ -744,335 +784,10 @@ impl<T: BeingType<T>> Game<T> {
             }
             if re_execute.load(Ordering::Relaxed) {
                 let events_split = self.split_events(re_execute_buffer);
-                self.expand_events(events_split.0);
-                self.execute_events(delta_time);
-                self.fill_tick_after_events(events_split.1);
+                self.expand_tick_events(events_split.0);
+                self.expand_tick_after_events(events_split.1);
+                self.execute_tick_events(delta_time);
             }
         }
     }
-
-    // pub fn execute_events(&mut self, manager: &mut IDManager, window: &mut Window, events: &mut Vec<WorldEvent<T>>, active_world: Arc<RwLock<World<T>>>) {
-    //     let mut ranked_events: HashMap<u32, Vec<WorldEvent<T>>> = HashMap::new();
-    //     let mut ranks: Vec<u32> = vec!();
-    //     loop {
-    //         match events.pop() {
-    //             Some(event) => {
-    //                 let rank = get_rank(event.clone());
-    //                 ranks.push(rank);
-    //                 if !ranked_events.contains_key(&rank) {
-    //                     ranked_events.insert(rank, vec!());
-    //                 }
-    //                 ranked_events.get_mut(&rank).expect("Unable to Get Mut rank in Execute Events").push(event);
-    //             },
-    //             None => break,
-    //         }
-    //     }
-    //     ranks.sort_by(|a, b| b.cmp(a));
-    //     {
-    //         for rank in ranks {
-    //             loop {
-    //                 match ranked_events.get_mut(&rank).expect("Unable to Get Mut Rank in Exceute Events").pop() {
-    //                     Some(event) => match event {
-    //                         WorldEvent::NewBeing(being_type, mut events) => {
-    //                             T::make_being(manager, being_type, &mut events, window, self, active_world.clone());
-    //                         },
-    //                         WorldEvent::NewBase(being_type) => {
-    //                             T::make_base(manager, being_type, window, self.transforms.clone(), active_world.clone());
-    //                         },
-    //                         WorldEvent::EndBeing(id) => {
-    //                             let mut world = active_world.write().expect("Unable to Write Active World in Execute Events");
-    //                             world.del_being(id);
-    //                         }
-    //                         WorldEvent::Pos2(id, vec2_event) => match vec2_event {
-    //                             Vec2Event::Set(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Pos2 in Execute Events").write().expect("Unable to Write Being in Set Pos2 in Execute Events")
-    //                                 .set_pos2(vec2);
-    //                             },
-    //                             Vec2Event::Add(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Pos2 in Execute Events").write().expect("Unable to Write Being in Add Pos2 in Execute Events")
-    //                                 .add_pos2(vec2);
-    //                             },
-    //                             Vec2Event::Mul(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Pos2 in Execute Events").write().expect("Unable to Write Being in Mul Pos2 in Execute Events")
-    //                                 .mul_pos2(vec2);
-    //                             },
-    //                         },
-    //                         WorldEvent::Pos3(id, vec3_event) => match vec3_event {
-    //                             Vec3Event::Set(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Pos3 in Execute Events").write().expect("Unable to Write Being in Set Pos3 in Execute Events")
-    //                                 .set_pos3(vec3);
-    //                             },
-    //                             Vec3Event::Add(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Pos3 in Execute Events").write().expect("Unable to Write Being in Add Pos3 in Execute Events")
-    //                                 .add_pos3(vec3);
-    //                             },
-    //                             Vec3Event::Mul(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Pos3 in Execute Events").write().expect("Unable to Write Being in Mul Pos3 in Execute Events")
-    //                                 .mul_pos3(vec3);
-    //                             },
-    //                         },
-    //                         WorldEvent::Vel2(id, vec2_event) => match vec2_event {
-    //                             Vec2Event::Set(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Vel2 in Execute Events").write().expect("Unable to Write Being in Set Vel2 in Execute Events")
-    //                                 .set_vel2(vec2);
-    //                             },
-    //                             Vec2Event::Add(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Vel2 in Execute Events").write().expect("Unable to Write Being in Add Vel2 in Execute Events")
-    //                                 .add_vel2(vec2);
-    //                             },
-    //                             Vec2Event::Mul(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Vel2 in Execute Events").write().expect("Unable to Write Being in Mul Vel2 in Execute Events")
-    //                                 .mul_vel2(vec2);
-    //                             },
-    //                         },
-    //                         WorldEvent::Vel3(id, vec3_event) => match vec3_event {
-    //                             Vec3Event::Set(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Vel3 in Execute Events").write().expect("Unable to Write Being in Set Vel3 in Execute Events")
-    //                                 .set_vel3(vec3);
-    //                             },
-    //                             Vec3Event::Add(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Vel3 in Execute Events").write().expect("Unable to Write Being in Add Vel3 in Execute Events")
-    //                                 .add_vel3(vec3);
-    //                             },
-    //                             Vec3Event::Mul(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Vel3 in Execute Events").write().expect("Unable to Write Being in Mul Vel3 in Execute Events")
-    //                                 .mul_vel3(vec3);
-    //                             },
-    //                         },
-    //                         WorldEvent::Acc2(id, vec2_event) => match vec2_event {
-    //                             Vec2Event::Set(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Acc2 in Execute Events").write().expect("Unable to Write Being in Set Acc2 in Execute Events")
-    //                                 .set_acc2(vec2);
-    //                             },
-    //                             Vec2Event::Add(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Acc2 in Execute Events").write().expect("Unable to Write Being in Add Acc2 in Execute Events")
-    //                                 .add_acc2(vec2);
-    //                             },
-    //                             Vec2Event::Mul(vec2) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Acc2 in Execute Events").write().expect("Unable to Write Being in Mul Acc2 in Execute Events")
-    //                                 .mul_acc2(vec2);
-    //                             },
-    //                         },
-    //                         WorldEvent::Acc3(id, vec3_event) => match vec3_event {
-    //                             Vec3Event::Set(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Set Acc3 in Execute Events").write().expect("Unable to Write Being in Set Acc3 in Execute Events")
-    //                                 .set_acc3(vec3);
-    //                             },
-    //                             Vec3Event::Add(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Add Acc3 in Execute Events").write().expect("Unable to Write Being in Add Acc3 in Execute Events")
-    //                                 .add_acc3(vec3);
-    //                             },
-    //                             Vec3Event::Mul(vec3) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 world.get_being(id).expect("Unable to Get Being in Mul Acc3 in Execute Events").write().expect("Unable to Write Being in Mul Acc3 in Execute Events")
-    //                                 .mul_acc3(vec3);
-    //                             },
-    //                         },
-    //                         WorldEvent::Entity(being_id, entity_id, entity_event) => match entity_event {
-    //                             EntityEvent::Vertices(vertices) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 window.set_vertices(entity, vertices);
-    //                             },
-    //                             EntityEvent::Indices(indices) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 window.set_indices(entity, indices);
-    //                             },
-    //                             EntityEvent::Texture(texture) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 window.set_texture(entity, texture);
-    //                             },
-    //                             EntityEvent::DrawMethod(draw_method) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 window.set_draw_parameters(entity, method_to_parameters(draw_method));
-    //                             },
-    //                             EntityEvent::Perspective(matrix, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms in Entity Perspective in Execute Events").set_perspective_matrix(entity, matrix, inverse);
-    //                             },
-    //                             EntityEvent::View(matrix, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Vertices in Execute Events").read().expect("Unable to Read Being in Entity Vertices in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Vertices in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms in Entity View in Execute Events").set_view_matrix(entity, matrix, inverse);
-    //                             },
-    //                             EntityEvent::Model(matrix, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Model in Execute Events").read().expect("Unable to Read Being in Entity Model in Execute Events");
-    //                                 let entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Model in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms in Entity Model in Execute Events").set_view_matrix(entity, matrix, inverse);
-    //                             },
-    //                             EntityEvent::UseNewID(id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let being = world.get_being(being_id).expect("Unable to Get Being in Entity Use New ID in Execute Events").read().expect("Unable to Read Being in Entity Use New ID in Execute Events");
-    //                                 let mut entity = being.get_entity(entity_id).expect("Unable to Get Entity in Entity Use New ID in Execute Events").write().expect("Unable to Write Entity in Entity Use New ID in Execute Events");
-    //                                 for id_type in id_types {
-    //                                     entity.use_new_id(manager, id_type);
-    //                                 }
-    //                             },
-    //                             EntityEvent::UseOldID(your_id, your_entity_id, id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let my_being = world.get_being(being_id).expect("Unable to Get Being(my being) in Entity Use Old ID in Execute Events").read().expect("Unable to Read Being in Entity Old ID in Execute Events");
-    //                                 let mut my_entity = my_being.get_entity(entity_id).expect("Unable to Get Entity in Entity Use Old ID in Execute Events").write().expect("Unable to Write Entity in Entity Use Old ID in Execute Events");
-    //                                 let your_being = world.get_being(your_id).expect("Unable to Get Being(your being) in Entity Use Old ID in Execute Events").read().expect("Unable to Read Being in Old ID in Execute Events");
-    //                                 let your_entity = your_being.get_entity(your_entity_id).expect("Unable to Get Entity in Base Use Old ID in Execute Events");
-    //                                 for id_type in id_types {
-    //                                     my_entity.use_other_id(your_entity, id_type);
-    //                                 }
-    //                             },
-    //                             EntityEvent::UseBaseID(your_type, your_entity_id, id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let my_being = world.get_being(being_id).expect("Unable to Get Being(my being) in Entity Use Base ID in Execute Events").read().expect("Unable to Read Being in Old ID in Execute Events");
-    //                                 let mut my_entity = my_being.get_entity(entity_id).expect("Unable to Get Entity in Entity Use Base ID in Execute Events").write().expect("Unable to Write Entity in Entity Use Base ID in Execute Events");
-    //                                 let your_base = world.get_base(your_type).expect("Unable to Find Base Being in Use Base ID in Execute Events").read().expect("Unable to Read Base in Entity Use Base ID in Execute Events");
-    //                                 let your_entity = your_base.get_entity(your_entity_id).expect("Unable to Find Base Entity in Use Base ID in Execute Events");
-    //                                 for id_type in id_types {
-    //                                     my_entity.use_other_id(your_entity, id_type);
-    //                                 }
-    //                             }
-    //                         },
-    //                         WorldEvent::EntityBase(being_type, entity_id, entity_base_event) => match entity_base_event {
-    //                             EntityEvent::Vertices(vertices) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Vertices Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Vertices in Execute Events").read().expect("Unable to Read Base in Entity Base Vertices in Execute Events");
-    //                                 window.set_vertices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Vertices in Execute Events"), vertices);
-    //                             },
-    //                             EntityEvent::Indices(indices) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Indices in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Indices in Execute Events").read().expect("Unable to Read Base in Entity Base Indices in Execute Events");
-    //                                 window.set_indices(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Indices in Execute Events"), indices);
-    //                             },
-    //                             EntityEvent::Texture(texture) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Texture in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Texture in Execute Events").read().expect("Unable to Read Base in Entity Base Texture in Execute Events");
-    //                                 window.set_texture(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Texture in Execute Events"), texture);
-    //                             },
-    //                             EntityEvent::DrawMethod(draw_method) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Draw Method in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Draw Method in Execute Events").read().expect("Unable to Read Base in Entity Base Draw Method in Execute Events");
-    //                                 window.set_draw_parameters(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Draw Method in Execute Events"), method_to_parameters(draw_method));
-    //                             },
-    //                             EntityEvent::Perspective(perspective, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Perspective in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Perspective in Execute Events").read().expect("Unable to Read Base in Entity Base Perspective in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms in Entity Base Perspective in Execute Events").set_perspective_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Perspective in Execute Events"), perspective, inverse);
-    //                             },
-    //                             EntityEvent::View(view, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base View in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base View in Execute Events").read().expect("Unable to Read Base in Entity Base View in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms Entity Base View in Execute Events").set_view_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base View in Execute Events"), view, inverse);
-    //                             },
-    //                             EntityEvent::Model(model, inverse) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Model in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Model in Execute Events").read().expect("Unable to Read Base in Entity Base Model in Execute Events");
-    //                                 self.transforms.read().expect("Unable to Read Transforms in Entity Base Model in Execute Events").set_model_matrix(base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Model in Execute Events"), model, inverse);
-    //                             },
-    //                             EntityEvent::UseNewID(id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Use New ID in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Use New ID in Execute Events").read().expect("Unable to Read Base in Entity Base Use New ID");
-    //                                 let mut entity = base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Use New ID in Execute Events").write().expect("Unable to Write Entity in Entity Base Use New ID");
-    //                                 for id_type in id_types {
-    //                                     entity.use_new_id(manager, id_type);
-    //                                 }
-    //                             },
-    //                             EntityEvent::UseOldID(your_being_id, your_entity_id, id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Entity Base Use Old ID in Execute Events");
-    //                                 let base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Use Old ID in Execute Events").read().expect("Unable to Read Base in Entity Base Use Old ID in Execute Events");
-    //                                 let mut my_entity = base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Use Old ID in Execute Events").write().expect("Unable to Write Entity in Entity Base Use Old ID in Execute Events");
-    //                                 let your_being = world.get_being(your_being_id).expect("Unable to Get Being in Entity Base Use Old ID in Execute Events").read().expect("Unable to Read Being in Entity Base Use Old ID in Execute Events");
-    //                                 let your_entity = your_being.get_entities().get(&your_entity_id).expect("Unable to Get Entity in Entity Base Use Old ID in Execute Events");
-    //                                 for id_type in id_types {
-    //                                     my_entity.use_other_id(your_entity, id_type);
-    //                                 }
-    //                             },
-    //                             EntityEvent::UseBaseID(your_being_type, your_entity_id, id_types) => {
-    //                                 let world = active_world.read().expect("Unable to Read Active World in Execute Events");
-    //                                 let my_base = world.get_base(being_type).expect("Unable to Get Base in Entity Base Use Base ID in Execute Events").read().expect("Unable to Read Base in Entity Base Use Base ID in Execute Events");
-    //                                 let mut my_entity = my_base.get_entity(entity_id).expect("Unable to Get Entity in Entity Base Use Base ID in Execute Events").write().expect("Unable to Write Entity in Entity Base Use Base ID in Execute Events");
-    //                                 let your_base = world.get_base(your_being_type).expect("Unable to Get Base in Entity Base Use Base ID in Execute Events").read().expect("Unable to Read Base in Entity Base Use Base ID in Execute Events");
-    //                                 let your_entity = your_base.get_entity(your_entity_id).expect("Unable to Get Entity in Entity Base Use Base ID in Execute Events");
-    //                                 for id_type in id_types {
-    //                                     my_entity.use_other_id(your_entity, id_type);
-    //                                 }
-    //                             }
-    //                         },
-    //                     },
-    //                     None => break,
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    //
-    // pub fn fix_unset(events: Vec<WorldEvent<T>>, being: &Box<Being<T>>) -> Vec<WorldEvent<T>>{
-    //     let mut fixed = vec!();
-    //     for event in events {
-    //         fixed.push(match event.clone() {
-    //             WorldEvent::NewBeing(_) => event,
-    //             WorldEvent::NewBase(_) => event,
-    //             WorldEvent::EndBeing(id) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::EndBeing(being.get_id()),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Pos2(id, vec2_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Pos2(being.get_id(), vec2_event),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Pos3(id, vec3_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Pos3(being.get_id(), vec3_event),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Vel2(id, vec2_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Vel2(being.get_id(), vec2_event),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Vel3(id, vec3_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Vel3(being.get_id(), vec3_event),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Acc2(id, vec2_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Acc2(being.get_id(), vec2_event),
-    //                 _ => event,
-    //             },
-    //             WorldEvent::Acc3(id, vec3_event) => match id.get_id() {
-    //                 UNSET_ID => WorldEvent::Acc3(being.get_id(), vec3_event),
-    //                 _ => event,
-    //             },
-    //             // WorldEvent::Entity(being_id, entity_id, entity_event) => match being_id.get_id() {
-    //             //     UNSET_ID => WorldEvent::Entity(being.get_id(), entity_id, entity_event),
-    //             //     _ => event,
-    //             // },
-    //             // WorldEvent::EntityBase(_, _, _) => event,
-    //             WorldEvent::Transform()
-    //         });
-    //     }
-    //     fixed
-    // }
 }
