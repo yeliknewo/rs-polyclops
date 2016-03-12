@@ -51,8 +51,8 @@ impl<T: BeingType<T>> World<T> {
         self.beings.get(&id)
     }
 
-    pub fn set_base(&mut self, being_type: T, base: Arc<RwLock<Box<Being<T>>>>) {
-        self.bases.insert(being_type, base);
+    pub fn set_base(&mut self, being_type: T, base: Box<Being<T>>) {
+        self.bases.insert(being_type, Arc::new(RwLock::new(base)));
     }
 
     pub fn get_base(&self, being_type: T) -> Option<&Arc<RwLock<Box<Being<T>>>>> {
@@ -145,8 +145,6 @@ pub fn get_rank<T: BeingType<T>>(event: TickEvent<T>) -> u32 {
             Vec3Event::Add(_) => 16,
             Vec3Event::Mul(_) => 17,
         },
-        TickEvent::Transform(_, _, _) => 1,
-        TickEvent::TransformBase(_, _, _) => 1,
         TickEvent::EntityID(_, _, event) => match event {
             EntityIDEvent::UseNewID(_) => 4,
             EntityIDEvent::UseOldID(_, _, _) => 3,
@@ -168,8 +166,10 @@ pub enum WorldEvent<T: BeingType<T>> {
 
 #[derive(Clone)]
 pub enum TickAfterEvent<T: BeingType<T>> {
-    Entity(ID, ID, EntityGraphicsEvent),
-    EntityBase(T, ID, EntityGraphicsEvent),
+    Entity(ID, u32, EntityGraphicsEvent),
+    EntityBase(T, u32, EntityGraphicsEvent),
+    Transform(ID, u32, TransformEvent),
+    TransformBase(T, u32, TransformEvent),
 }
 
 #[derive(Clone)]
@@ -183,10 +183,8 @@ pub enum TickEvent<T: BeingType<T>> {
     Vel3(ID, Vec3Event),
     Acc2(ID, Vec2Event),
     Acc3(ID, Vec3Event),
-    Transform(ID, ID, TransformEvent),
-    TransformBase(T, ID, TransformEvent),
-    EntityID(ID, ID, EntityIDEvent<T>),
-    EntityIDBase(T, ID, EntityIDEvent<T>),
+    EntityID(ID, u32, EntityIDEvent<T>),
+    EntityIDBase(T, u32, EntityIDEvent<T>),
 }
 
 #[allow(dead_code)]
@@ -201,8 +199,8 @@ pub enum TransformEvent {
 #[derive(Clone)]
 pub enum EntityIDEvent<T: BeingType<T>> {
     UseNewID(Vec<EntityIDType>),
-    UseOldID(ID, ID, Vec<EntityIDType>),
-    UseBaseID(T, ID, Vec<EntityIDType>),
+    UseOldID(ID, u32, Vec<EntityIDType>),
+    UseBaseID(T, u32, Vec<EntityIDType>),
 }
 
 #[allow(dead_code)]

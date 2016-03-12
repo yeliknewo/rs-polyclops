@@ -354,7 +354,8 @@ impl Entity {
         }
     }
 
-    pub fn new_from(entity: &Entity) -> Entity {
+    pub fn new_from(entity: &Arc<RwLock<Entity>>) -> Entity {
+        let entity = entity.read().expect("Unable to Read Entity in New From in Entity");
         Entity {
             texture_id: entity.texture_id,
             vertex_id: entity.vertex_id,

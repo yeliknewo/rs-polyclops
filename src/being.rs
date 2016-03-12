@@ -15,10 +15,10 @@ pub trait BeingType<T: BeingType<T>>: Send + Sync + Clone + Eq + PartialEq + Has
 pub trait Being<T: BeingType<T>>: Send + Sync {
     fn get_type(&self) -> T;
     fn get_id(&self) -> ID;
-    fn get_entity(&self, id: ID) -> Option<&Arc<RwLock<Entity>>> {
+    fn get_entity(&self, id: u32) -> Option<&Arc<RwLock<Entity>>> {
         self.get_entities().get(&id)
     }
-    fn get_entities(&self) -> &HashMap<ID, Arc<RwLock<Entity>>>;
+    fn get_entities(&self) -> &HashMap<u32, Arc<RwLock<Entity>>>;
     fn tick(&self, &World<T>, &Transforms, &f32) -> Vec<TickEvent<T>>;
     fn tick_after(&self, &World<T>, &Transforms) -> Vec<TickAfterEvent<T>>;
     fn get_pos2(&self) -> Vec2 {

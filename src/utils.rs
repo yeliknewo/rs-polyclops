@@ -34,6 +34,7 @@ impl Display for ID {
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum IDType {
     Entity(EntityIDType),
+    EntityContainer,
     Being,
     World,
 }
